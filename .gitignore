@@ -1,0 +1,31 @@
+# Unreal Engine project files to ignore
+
+# Build artifacts
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/*/Binaries/
+Build/*/Intermediate/
+
+# Visual Studio / IDE
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+.vs/
+
+# User-specific
+*.user
+*.userprefs
+
+# Backup / autosave
+*_BuiltData.uasset
+*.tmp
+*.log
+
+# Plugins build artifacts
+Plugins/*/Binaries/
+Plugins/*/Intermediate/
