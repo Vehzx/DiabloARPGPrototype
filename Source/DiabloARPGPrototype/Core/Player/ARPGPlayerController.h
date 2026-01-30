@@ -19,15 +19,14 @@ public:
 protected:
     virtual void BeginPlay() override;
     virtual void SetupInputComponent() override;
+    virtual void OnPossess(APawn* InPawn) override;
 
 private:
-    // Input assets loaded in C++
     UPROPERTY()
     UInputMappingContext* InputMappingContext;
 
     UPROPERTY()
     UInputAction* MoveAction;
 
-    // Movement handler
     void HandleMove(const FInputActionValue& Value);
 };

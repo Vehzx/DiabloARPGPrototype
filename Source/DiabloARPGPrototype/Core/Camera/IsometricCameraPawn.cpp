@@ -20,11 +20,36 @@ AIsometricCameraPawn::AIsometricCameraPawn()
 void AIsometricCameraPawn::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+    {
+        PC->SetViewTarget(this);
+    }
 }
 
 void AIsometricCameraPawn::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
+
+    if (TargetActor)
+    {
+        FVector TargetLocation = TargetActor->GetActorLocation();
+        FVector CurrentLocation = GetActorLocation();
+
+        FVector NewLocation = FMath::VInterpTo(
+            CurrentLocation,
+            FVector(TargetLocation.X, TargetLocation.Y, CurrentLocation.Z),
+            DeltaTime,
+            FollowSpeed
+        );
+
+        SetActorLocation(NewLocation);
+    }
+}
+
+void AIsometricCameraPawn::SetFollowTarget(AActor* NewTarget)
+{
+    TargetActor = NewTarget;
 }
 
 void AIsometricCameraPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
