@@ -19,14 +19,8 @@ public:
 protected:
     virtual void BeginPlay() override;
     virtual void SetupInputComponent() override;
-    virtual void OnPossess(APawn* InPawn) override;
 
 private:
-    UPROPERTY()
-    UInputMappingContext* InputMappingContext;
-
-    UPROPERTY()
-    UInputAction* MoveAction;
-
-    void HandleMove(const FInputActionValue& Value);
+    void MoveForward(float Value);
+    void MoveRight(float Value);
 };
