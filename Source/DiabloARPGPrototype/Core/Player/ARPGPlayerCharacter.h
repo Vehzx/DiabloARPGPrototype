@@ -17,4 +17,14 @@ protected:
 
 public:
     virtual void Tick(float DeltaTime) override;
-}; 
+
+private:
+
+    // ----------------------------------------------------
+    // Components
+    // ----------------------------------------------------
+
+    /** Simple placeholder mesh for the character body */
+    UPROPERTY(VisibleAnywhere, Category = "Visual")
+    class UStaticMeshComponent* BodyMesh;
+};
