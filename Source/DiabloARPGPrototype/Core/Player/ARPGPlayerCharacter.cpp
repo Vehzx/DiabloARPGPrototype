@@ -3,14 +3,15 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/StaticMesh.h"
+#include "DiabloARPGPrototype/Core/Player/UHealthComponent.h"
 
 AARPGPlayerCharacter::AARPGPlayerCharacter()
 {
     PrimaryActorTick.bCanEverTick = true;
 
-    // ----------------------------------------------------
+    // ============================================================
     // Movement Setup
-    // ----------------------------------------------------
+    // ============================================================
     if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
     {
         MoveComp->MaxWalkSpeed = 600.f;
@@ -18,15 +19,19 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
         MoveComp->RotationRate = FRotator(0.f, 540.f, 0.f);
     }
 
-    // ----------------------------------------------------
-    // Visual Mesh Setup
-    // ----------------------------------------------------
+    // ============================================================
+    // Health Component
+    // ============================================================
+    HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("HealthComponent"));
 
-    // Create the mesh component
+    // ============================================================
+    // Visual Mesh Setup
+    // ============================================================
+
     BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh"));
     BodyMesh->SetupAttachment(GetCapsuleComponent());
 
-    // Load a simple cylinder mesh from the engine content
+    // Load a simple cylinder mesh from Engine Content
     static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(
         TEXT("/Engine/BasicShapes/Cylinder.Cylinder")
     );
@@ -40,16 +45,33 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
         BodyMesh->SetRelativeLocation(FVector(0.f, 0.f, -45.f));
     }
 
-    // Ensure the capsule is visible for debugging (optional)
+    // Optional: make capsule visible for debugging
     GetCapsuleComponent()->SetHiddenInGame(false);
 }
 
 void AARPGPlayerCharacter::BeginPlay()
 {
     Super::BeginPlay();
+
+    // Bind death event
+    if (HealthComponent)
+    {
+        HealthComponent->OnDeath.AddDynamic(this, &AARPGPlayerCharacter::HandleDeath);
+    }
 }
 
 void AARPGPlayerCharacter::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
+}
+
+void AARPGPlayerCharacter::HandleDeath()
+{
+    UE_LOG(LogTemp, Warning, TEXT("Player has died"));
+
+    // Disable input so the player can't move after death
+    DisableInput(nullptr);
+
+    // Optional: destroy after delay
+    // SetLifeSpan(3.f);
 }
