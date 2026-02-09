@@ -2,28 +2,22 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
-#include "ARPGPlayerCharacter.generated.h"
+#include "ARPGEnemyCharacter.generated.h"
 
 // Forward declarations
 class UStaticMeshComponent;
 class UHealthComponent;
 
 UCLASS()
-class DIABLOARPGPROTOTYPE_API AARPGPlayerCharacter : public ACharacter
+class DIABLOARPGPROTOTYPE_API AARPGEnemyCharacter : public ACharacter
 {
     GENERATED_BODY()
 
 public:
-    AARPGPlayerCharacter();
+    AARPGEnemyCharacter();
 
 protected:
     virtual void BeginPlay() override;
-
-    /** Input bindings */
-    virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-
-public:
-    virtual void Tick(float DeltaTime) override;
 
 private:
 
@@ -31,11 +25,11 @@ private:
     // Components
     // ============================================================
 
-    /** Simple placeholder mesh for the character body */
+    /** Simple placeholder mesh for the enemy body */
     UPROPERTY(VisibleAnywhere, Category = "Components")
     UStaticMeshComponent* BodyMesh;
 
-    /** Health system for the player */
+    /** Health system for the enemy */
     UPROPERTY(VisibleAnywhere, Category = "Components")
     UHealthComponent* HealthComponent;
 
@@ -43,11 +37,7 @@ private:
     // Internal Functions
     // ============================================================
 
-    /** Called when the player dies */
+    /** Called when the enemy dies */
     UFUNCTION()
     void HandleDeath();
-
-    /** Test attack for debugging (left-click) */
-    UFUNCTION()
-    void PerformTestAttack();
 };

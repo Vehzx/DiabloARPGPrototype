@@ -49,6 +49,56 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
     GetCapsuleComponent()->SetHiddenInGame(false);
 }
 
+void AARPGPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+    Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+    PlayerInputComponent->BindAction("TestAttack", IE_Pressed, this, &AARPGPlayerCharacter::PerformTestAttack);
+}
+
+void AARPGPlayerCharacter::PerformTestAttack()
+{
+    FVector Start = GetActorLocation() + FVector(0, 0, 50.f); // chest height
+    FVector Forward = GetActorForwardVector();
+    FVector End = Start + Forward * 200.f; // Attack range
+
+    float Radius = 60.f;
+
+    FCollisionShape Sphere = FCollisionShape::MakeSphere(Radius);
+
+    FCollisionQueryParams Params;
+    Params.AddIgnoredActor(this); // Ignore the player
+
+    FHitResult Hit;
+    bool bHit = GetWorld()->SweepSingleByChannel(
+        Hit,
+        Start,
+        End,
+        FQuat::Identity,
+        ECC_Pawn,
+        Sphere,
+        Params
+    );
+
+    // Debug
+    DrawDebugLine(GetWorld(), Start, End, FColor::Red, false, 1.f, 0, 2.f);
+    DrawDebugSphere(GetWorld(), End, Radius, 12, FColor::Red, false, 1.f);
+
+    if (bHit)
+    {
+        AActor* HitActor = Hit.GetActor();
+        if (HitActor)
+        {
+            UHealthComponent* Health = HitActor->FindComponentByClass<UHealthComponent>();
+            if (Health)
+            {
+                Health->ApplyDamage(25.f);
+                UE_LOG(LogTemp, Warning, TEXT("Hit %s for 25 damage"), *HitActor->GetName());
+            }
+        }
+    }
+}
+
 void AARPGPlayerCharacter::BeginPlay()
 {
     Super::BeginPlay();
