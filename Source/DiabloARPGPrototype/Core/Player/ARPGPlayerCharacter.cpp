@@ -1,9 +1,11 @@
 #include "ARPGPlayerCharacter.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/WidgetComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/StaticMesh.h"
 #include "DiabloARPGPrototype/Core/Player/UHealthComponent.h"
+#include "DiabloARPGPrototype/Core/Player/WHealthBarWidget.h"
 
 AARPGPlayerCharacter::AARPGPlayerCharacter()
 {
@@ -23,6 +25,25 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
     // Health Component
     // ============================================================
     HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("HealthComponent"));
+
+    // ============================================================
+    // Health Bar Widget Component
+    // ============================================================
+    HealthBarWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBar"));
+    HealthBarWidgetComponent->SetupAttachment(RootComponent);
+    HealthBarWidgetComponent->SetWidgetSpace(EWidgetSpace::Screen);
+    HealthBarWidgetComponent->SetDrawSize(FVector2D(120.f, 12.f));
+    HealthBarWidgetComponent->SetRelativeLocation(FVector(0.f, 0.f, 120.f)); // above head
+
+    // Load the widget class
+    static ConstructorHelpers::FClassFinder<UUserWidget> HealthBarClass(
+        TEXT("/Game/UI/WBP_HealthBar.WBP_HealthBar_C")
+    );
+
+    if (HealthBarClass.Succeeded())
+    {
+        HealthBarWidgetComponent->SetWidgetClass(HealthBarClass.Class);
+    }
 
     // ============================================================
     // Visual Mesh Setup
@@ -107,6 +128,15 @@ void AARPGPlayerCharacter::BeginPlay()
     if (HealthComponent)
     {
         HealthComponent->OnDeath.AddDynamic(this, &AARPGPlayerCharacter::HandleDeath);
+    }
+
+    // Bind healthbar widget to health component
+    if (HealthBarWidgetComponent)
+    {
+        if (UWHealthBarWidget* HB = Cast<UWHealthBarWidget>(HealthBarWidgetComponent->GetUserWidgetObject()))
+        {
+            HB->InitializeHealth(HealthComponent);
+        }
     }
 }
 

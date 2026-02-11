@@ -8,7 +8,7 @@
 // Delegates
 // ------------------------------------------------------------
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHealthChanged, float, NewHealth);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHealthChanged, float, NewHealth, float, MaxHealth);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDeath);
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))

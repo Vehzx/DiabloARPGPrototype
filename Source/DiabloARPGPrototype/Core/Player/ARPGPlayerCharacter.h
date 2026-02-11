@@ -7,6 +7,7 @@
 // Forward declarations
 class UStaticMeshComponent;
 class UHealthComponent;
+class UWidgetComponent;
 
 UCLASS()
 class DIABLOARPGPROTOTYPE_API AARPGPlayerCharacter : public ACharacter
@@ -38,6 +39,10 @@ private:
     /** Health system for the player */
     UPROPERTY(VisibleAnywhere, Category = "Components")
     UHealthComponent* HealthComponent;
+
+    /** Floating healthbar widget */
+    UPROPERTY(VisibleAnywhere, Category = "Components")
+    UWidgetComponent* HealthBarWidgetComponent;
 
     // ============================================================
     // Internal Functions

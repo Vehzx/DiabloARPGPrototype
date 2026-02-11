@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Components/WidgetComponent.h"
 #include "ARPGEnemyCharacter.generated.h"
 
 // Forward declarations
@@ -40,4 +41,7 @@ private:
     /** Called when the enemy dies */
     UFUNCTION()
     void HandleDeath();
+
+    UPROPERTY(VisibleAnywhere, Category = "Components")
+    UWidgetComponent* HealthBarWidgetComponent;
 };
