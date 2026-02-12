@@ -2,12 +2,17 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
-#include "Components/WidgetComponent.h"
 #include "ARPGEnemyCharacter.generated.h"
 
 // Forward declarations
 class UStaticMeshComponent;
 class UHealthComponent;
+class UWidgetComponent;
+
+class UAIPerceptionComponent;
+class UAISenseConfig_Sight;
+class UAISenseConfig_Hearing;
+class UAISenseConfig_Damage;
 
 UCLASS()
 class DIABLOARPGPROTOTYPE_API AARPGEnemyCharacter : public ACharacter
@@ -22,26 +27,32 @@ protected:
 
 private:
 
-    // ============================================================
     // Components
-    // ============================================================
-
-    /** Simple placeholder mesh for the enemy body */
     UPROPERTY(VisibleAnywhere, Category = "Components")
     UStaticMeshComponent* BodyMesh;
 
-    /** Health system for the enemy */
     UPROPERTY(VisibleAnywhere, Category = "Components")
     UHealthComponent* HealthComponent;
 
-    // ============================================================
-    // Internal Functions
-    // ============================================================
+    UPROPERTY(VisibleAnywhere, Category = "Components")
+    UWidgetComponent* HealthBarWidgetComponent;
 
-    /** Called when the enemy dies */
     UFUNCTION()
     void HandleDeath();
 
-    UPROPERTY(VisibleAnywhere, Category = "Components")
-    UWidgetComponent* HealthBarWidgetComponent;
+    // AI Perception
+    UPROPERTY(VisibleAnywhere, Category = "AI")
+    UAIPerceptionComponent* PerceptionComponent;
+
+    UPROPERTY()
+    UAISenseConfig_Sight* SightConfig;
+
+    UPROPERTY()
+    UAISenseConfig_Hearing* HearingConfig;
+
+    UPROPERTY()
+    UAISenseConfig_Damage* DamageConfig;
+
+    UFUNCTION()
+    void OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
 };
