@@ -1,4 +1,8 @@
 #include "ARPGEnemyCharacter.h"
+#include "Camera/CameraActor.h"
+#include "NavigationSystem.h"
+#include "NavigationPath.h"
+#include "Navigation/PathFollowingComponent.h" // <-- ADD THIS
 #include "Components/CapsuleComponent.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
@@ -15,13 +19,13 @@
 #include "DiabloARPGPrototype/Core/Camera/IsometricCameraPawn.h"
 #include "Components/WidgetComponent.h"
 
+#include "ARPGEnemyAIController.h"
+
 AARPGEnemyCharacter::AARPGEnemyCharacter()
 {
-    PrimaryActorTick.bCanEverTick = false;
+    PrimaryActorTick.bCanEverTick = true;
 
-    // ============================================================
     // Movement Setup
-    // ============================================================
     if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
     {
         MoveComp->MaxWalkSpeed = 300.f;
@@ -29,21 +33,16 @@ AARPGEnemyCharacter::AARPGEnemyCharacter()
         MoveComp->RotationRate = FRotator(0.f, 540.f, 0.f);
     }
 
-    // ============================================================
     // Health Component
-    // ============================================================
     HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("HealthComponent"));
 
-    // ============================================================
     // Health Bar Widget Component
-    // ============================================================
     HealthBarWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBar"));
     HealthBarWidgetComponent->SetupAttachment(RootComponent);
     HealthBarWidgetComponent->SetWidgetSpace(EWidgetSpace::Screen);
     HealthBarWidgetComponent->SetDrawSize(FVector2D(120.f, 12.f));
-    HealthBarWidgetComponent->SetRelativeLocation(FVector(0.f, 0.f, 120.f)); // above head
+    HealthBarWidgetComponent->SetRelativeLocation(FVector(0.f, 0.f, 120.f));
 
-    // Load the widget class
     static ConstructorHelpers::FClassFinder<UUserWidget> HealthBarClass(
         TEXT("/Game/UI/WBP_HealthBar.WBP_HealthBar_C")
     );
@@ -53,17 +52,13 @@ AARPGEnemyCharacter::AARPGEnemyCharacter()
         HealthBarWidgetComponent->SetWidgetClass(HealthBarClass.Class);
     }
 
-    // ============================================================
     // AI Perception Component
-    // ============================================================
-
     PerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("PerceptionComponent"));
 
     SightConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightConfig"));
     HearingConfig = CreateDefaultSubobject<UAISenseConfig_Hearing>(TEXT("HearingConfig"));
     DamageConfig = CreateDefaultSubobject<UAISenseConfig_Damage>(TEXT("DamageConfig"));
 
-    // Sight settings
     SightConfig->SightRadius = 1200.f;
     SightConfig->LoseSightRadius = 1500.f;
     SightConfig->PeripheralVisionAngleDegrees = 70.f;
@@ -72,31 +67,22 @@ AARPGEnemyCharacter::AARPGEnemyCharacter()
     SightConfig->DetectionByAffiliation.bDetectFriendlies = true;
     SightConfig->DetectionByAffiliation.bDetectNeutrals = true;
 
-    // Hearing settings
     HearingConfig->HearingRange = 1500.f;
     HearingConfig->SetMaxAge(2.f);
 
-    // Damage sense (react when hit)
     DamageConfig->SetMaxAge(2.f);
 
-    // Register senses
     PerceptionComponent->ConfigureSense(*SightConfig);
     PerceptionComponent->ConfigureSense(*HearingConfig);
     PerceptionComponent->ConfigureSense(*DamageConfig);
     PerceptionComponent->SetDominantSense(SightConfig->GetSenseImplementation());
 
-    // Bind callback
     PerceptionComponent->OnTargetPerceptionUpdated.AddDynamic(this, &AARPGEnemyCharacter::OnTargetPerceptionUpdated);
 
-
-    // ============================================================
     // Visual Mesh Setup
-    // ============================================================
-
     BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh"));
     BodyMesh->SetupAttachment(GetCapsuleComponent());
 
-    // Load a simple cylinder mesh from Engine Content
     static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(
         TEXT("/Engine/BasicShapes/Cylinder.Cylinder")
     );
@@ -104,17 +90,10 @@ AARPGEnemyCharacter::AARPGEnemyCharacter()
     if (CylinderMesh.Succeeded())
     {
         BodyMesh->SetStaticMesh(CylinderMesh.Object);
-
-        // Scale and position it to look like a humanoid placeholder
         BodyMesh->SetRelativeScale3D(FVector(0.5f, 0.5f, 1.2f));
         BodyMesh->SetRelativeLocation(FVector(0.f, 0.f, -45.f));
-
-        UE_LOG(LogTemp, Warning, TEXT("Enemy BodyMesh: %s"),
-            BodyMesh->GetStaticMesh() ? TEXT("Loaded") : TEXT("NULL"));
-
     }
 
-    // Optional: make capsule visible for debugging
     GetCapsuleComponent()->SetHiddenInGame(false);
 }
 
@@ -127,7 +106,6 @@ void AARPGEnemyCharacter::BeginPlay()
         HealthComponent->OnDeath.AddDynamic(this, &AARPGEnemyCharacter::HandleDeath);
     }
 
-    // Bind healthbar widget to health component
     if (HealthBarWidgetComponent)
     {
         if (UWHealthBarWidget* HB = Cast<UWHealthBarWidget>(HealthBarWidgetComponent->GetUserWidgetObject()))
@@ -137,18 +115,19 @@ void AARPGEnemyCharacter::BeginPlay()
     }
 }
 
+AARPGEnemyAIController* AARPGEnemyCharacter::GetEnemyAIController() const
+{
+    return Cast<AARPGEnemyAIController>(GetController());
+}
+
 void AARPGEnemyCharacter::HandleDeath()
 {
     UE_LOG(LogTemp, Warning, TEXT("Enemy died"));
 
-    // Stop movement
     GetCharacterMovement()->DisableMovement();
-
-    // Hide the mesh + capsule
     GetMesh()->SetVisibility(false, true);
     GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-    // Destroy after delay
     Destroy();
 }
 
@@ -157,7 +136,11 @@ void AARPGEnemyCharacter::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus S
     if (!Actor)
         return;
 
-    // Ignore camera pawn
+    // Ignore camera actors
+    if (Actor->IsA(ACameraActor::StaticClass()))
+        return;
+
+    // Ignore isometric camera pawn
     if (Actor->IsA(AIsometricCameraPawn::StaticClass()))
         return;
 
@@ -167,10 +150,103 @@ void AARPGEnemyCharacter::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus S
 
     if (Stimulus.WasSuccessfullySensed())
     {
-        UE_LOG(LogTemp, Warning, TEXT("Enemy sees or hears: %s"), *Actor->GetName());
+        CurrentTarget = Actor;
+        SetEnemyState(EEnemyState::Chase);
     }
     else
     {
-        UE_LOG(LogTemp, Warning, TEXT("Enemy lost sight of: %s"), *Actor->GetName());
+        CurrentTarget = nullptr;
+        SetEnemyState(EEnemyState::Idle);
+    }
+}
+
+void AARPGEnemyCharacter::SetEnemyState(EEnemyState NewState)
+{
+    if (CurrentState == NewState)
+        return;
+
+    EEnemyState OldState = CurrentState;
+    CurrentState = NewState;
+
+    UE_LOG(LogTemp, Warning, TEXT("[AI STATE] %s -> %s"),
+        *UEnum::GetValueAsString(OldState),
+        *UEnum::GetValueAsString(NewState));
+
+    HandleStateChanged(OldState, NewState);
+}
+
+void AARPGEnemyCharacter::HandleStateChanged(EEnemyState OldState, EEnemyState NewState)
+{
+    switch (NewState)
+    {
+    case EEnemyState::Idle:
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[AI] Entered IDLE state"));
+
+        if (AARPGEnemyAIController* AICon = GetEnemyAIController())
+        {
+            AICon->StopMovement();
+        }
+
+        break;
+    }
+
+    case EEnemyState::Chase:
+        UE_LOG(LogTemp, Warning, TEXT("[AI] Entered CHASE state"));
+        break;
+
+    case EEnemyState::Attack:
+        UE_LOG(LogTemp, Warning, TEXT("[AI] Entered ATTACK state"));
+        break;
+
+    case EEnemyState::Dead:
+        UE_LOG(LogTemp, Warning, TEXT("[AI] Entered DEAD state"));
+        break;
+    }
+}
+
+void AARPGEnemyCharacter::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    // --- NAVMESH CHECK ---
+    UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(GetWorld());
+    if (NavSys)
+    {
+        FNavLocation OutLocation;
+        bool bOnNav = NavSys->ProjectPointToNavigation(GetActorLocation(), OutLocation);
+
+        if (!bOnNav)
+        {
+            UE_LOG(LogTemp, Error, TEXT("[AI] Enemy is NOT on the NavMesh!"));
+        }
+    }
+
+    // --- CHASE LOGIC ---
+    if (CurrentState == EEnemyState::Chase && CurrentTarget)
+    {
+        AARPGEnemyAIController* AICon = GetEnemyAIController();
+        if (AICon)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[AI] Calling MoveToActor"));
+
+            EPathFollowingRequestResult::Type Result =
+                AICon->MoveToActor(CurrentTarget, 5.f);
+
+            switch (Result)
+            {
+            case EPathFollowingRequestResult::Failed:
+                UE_LOG(LogTemp, Error, TEXT("[AI] MoveToActor FAILED"));
+                break;
+
+            case EPathFollowingRequestResult::AlreadyAtGoal:
+                UE_LOG(LogTemp, Warning, TEXT("[AI] MoveToActor: Already at goal"));
+                break;
+
+            case EPathFollowingRequestResult::RequestSuccessful:
+                UE_LOG(LogTemp, Warning, TEXT("[AI] MoveToActor: Request Successful"));
+                break;
+            }
+        }
     }
 }

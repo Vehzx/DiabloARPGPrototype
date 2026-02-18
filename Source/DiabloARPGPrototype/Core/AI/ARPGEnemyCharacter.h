@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Perception/AIPerceptionTypes.h"
 #include "ARPGEnemyCharacter.generated.h"
 
 // Forward declarations
@@ -14,6 +15,17 @@ class UAISenseConfig_Sight;
 class UAISenseConfig_Hearing;
 class UAISenseConfig_Damage;
 
+class AARPGEnemyAIController;
+
+UENUM(BlueprintType)
+enum class EEnemyState : uint8
+{
+    Idle,
+    Chase,
+    Attack,
+    Dead
+};
+
 UCLASS()
 class DIABLOARPGPROTOTYPE_API AARPGEnemyCharacter : public ACharacter
 {
@@ -21,6 +33,7 @@ class DIABLOARPGPROTOTYPE_API AARPGEnemyCharacter : public ACharacter
 
 public:
     AARPGEnemyCharacter();
+    virtual void Tick(float DeltaTime) override;
 
 protected:
     virtual void BeginPlay() override;
@@ -55,4 +68,17 @@ private:
 
     UFUNCTION()
     void OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
+
+    AARPGEnemyAIController* GetEnemyAIController() const;
+
+    // Enemy State Machine
+    UPROPERTY(VisibleAnywhere, Category = "AI")
+    EEnemyState CurrentState = EEnemyState::Idle;
+
+    // Current target the enemy is chasing
+    UPROPERTY()
+    AActor* CurrentTarget = nullptr;
+
+    void SetEnemyState(EEnemyState NewState);
+    void HandleStateChanged(EEnemyState OldState, EEnemyState NewState);
 };
