@@ -55,4 +55,6 @@ private:
     /** Test attack for debugging (left-click) */
     UFUNCTION()
     void PerformTestAttack();
+
+    void RotateTowardMouseCursor();
 };

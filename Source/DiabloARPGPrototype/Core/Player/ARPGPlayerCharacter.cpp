@@ -79,6 +79,9 @@ void AARPGPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 
 void AARPGPlayerCharacter::PerformTestAttack()
 {
+    // NEW: Rotate player toward mouse cursor before attacking
+    RotateTowardMouseCursor();
+
     FVector Start = GetActorLocation() + FVector(0, 0, 50.f); // chest height
     FVector Forward = GetActorForwardVector();
     FVector End = Start + Forward * 200.f; // Attack range
@@ -136,6 +139,27 @@ void AARPGPlayerCharacter::BeginPlay()
         if (UWHealthBarWidget* HB = Cast<UWHealthBarWidget>(HealthBarWidgetComponent->GetUserWidgetObject()))
         {
             HB->InitializeHealth(HealthComponent);
+        }
+    }
+}
+
+void AARPGPlayerCharacter::RotateTowardMouseCursor()
+{
+    APlayerController* PC = Cast<APlayerController>(GetController());
+    if (!PC)
+        return;
+
+    FHitResult Hit;
+    if (PC->GetHitResultUnderCursor(ECC_Visibility, false, Hit))
+    {
+        FVector Target = Hit.ImpactPoint;
+        FVector Direction = Target - GetActorLocation();
+        Direction.Z = 0.f; // keep rotation flat
+
+        if (!Direction.IsNearlyZero())
+        {
+            FRotator NewRot = Direction.Rotation();
+            SetActorRotation(NewRot);
         }
     }
 }

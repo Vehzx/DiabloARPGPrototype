@@ -12,6 +12,14 @@ void AARPGPlayerController::BeginPlay()
 {
     Super::BeginPlay();
 
+    bShowMouseCursor = true;
+    bEnableClickEvents = true;
+    bEnableMouseOverEvents = true;
+
+    FInputModeGameAndUI InputMode;
+    InputMode.SetHideCursorDuringCapture(false);
+    SetInputMode(InputMode);
+
     // Attach camera pawn to player
     for (TActorIterator<AIsometricCameraPawn> It(GetWorld()); It; ++It)
     {
