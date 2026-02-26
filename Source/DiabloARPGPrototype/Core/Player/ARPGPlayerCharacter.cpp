@@ -22,6 +22,17 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
     }
 
     // ============================================================
+    // Collision
+    // ============================================================
+    UCapsuleComponent* Capsule = GetCapsuleComponent();
+    Capsule->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+    Capsule->SetCollisionObjectType(ECC_Pawn);
+    Capsule->SetCollisionResponseToAllChannels(ECR_Block);
+
+    // Optional: ignore camera traces
+    Capsule->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
+
+    // ============================================================
     // Health Component
     // ============================================================
     HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("HealthComponent"));
@@ -167,15 +178,36 @@ void AARPGPlayerCharacter::RotateTowardMouseCursor()
 void AARPGPlayerCharacter::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
+
+    if (bIsDying)
+    {
+        FVector NewScale = GetActorScale3D() - FVector(DeathShrinkSpeed * DeltaTime);
+
+        // Clamp to zero so it never goes negative
+        NewScale.X = FMath::Max(NewScale.X, 0.0f);
+        NewScale.Y = FMath::Max(NewScale.Y, 0.0f);
+        NewScale.Z = FMath::Max(NewScale.Z, 0.0f);
+
+        SetActorScale3D(NewScale);
+    }
 }
 
 void AARPGPlayerCharacter::HandleDeath()
 {
     UE_LOG(LogTemp, Warning, TEXT("Player has died"));
 
-    // Disable input so the player can't move after death
+    // Disable input
     DisableInput(nullptr);
 
-    // Optional: destroy after delay
-    // SetLifeSpan(3.f);
+    // Disable movement
+    GetCharacterMovement()->DisableMovement();
+
+    // Disable collision
+    GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    // Begin shrinking
+    bIsDying = true;
+
+    // Destroy after 1 second
+    SetLifeSpan(1.0f);
 }

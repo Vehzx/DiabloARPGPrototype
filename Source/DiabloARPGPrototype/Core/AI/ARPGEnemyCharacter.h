@@ -81,4 +81,18 @@ private:
 
     void SetEnemyState(EEnemyState NewState);
     void HandleStateChanged(EEnemyState OldState, EEnemyState NewState);
+
+    // Combat
+    UPROPERTY(EditAnywhere, Category = "Combat")
+    float AttackRange = 120.f;
+
+    UPROPERTY(EditAnywhere, Category = "Combat")
+    float AttackDamage = 10.f;
+
+    UPROPERTY(EditAnywhere, Category = "Combat")
+    float AttackCooldown = 1.0f;
+
+    float TimeSinceLastAttack = 0.f;
+
+    void PerformAttack();
 };

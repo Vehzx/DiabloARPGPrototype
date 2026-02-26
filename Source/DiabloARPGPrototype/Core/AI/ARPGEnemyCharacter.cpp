@@ -136,22 +136,19 @@ void AARPGEnemyCharacter::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus S
     if (!Actor)
         return;
 
-    // Ignore camera actors
-    if (Actor->IsA(ACameraActor::StaticClass()))
-        return;
-
-    // Ignore isometric camera pawn
-    if (Actor->IsA(AIsometricCameraPawn::StaticClass()))
-        return;
-
-    // Ignore other enemies
-    if (Actor->IsA(AARPGEnemyCharacter::StaticClass()))
-        return;
+    if (Actor->IsA(ACameraActor::StaticClass())) return;
+    if (Actor->IsA(AIsometricCameraPawn::StaticClass())) return;
+    if (Actor->IsA(AARPGEnemyCharacter::StaticClass())) return;
 
     if (Stimulus.WasSuccessfullySensed())
     {
         CurrentTarget = Actor;
-        SetEnemyState(EEnemyState::Chase);
+
+        // Only switch to Chase if not already attacking
+        if (CurrentState != EEnemyState::Attack)
+        {
+            SetEnemyState(EEnemyState::Chase);
+        }
     }
     else
     {
@@ -205,9 +202,50 @@ void AARPGEnemyCharacter::HandleStateChanged(EEnemyState OldState, EEnemyState N
     }
 }
 
+void AARPGEnemyCharacter::PerformAttack()
+{
+    if (!CurrentTarget)
+    {
+        UE_LOG(LogTemp, Error, TEXT("[AI] PerformAttack() called but CurrentTarget is NULL"));
+        return;
+    }
+
+    UE_LOG(LogTemp, Warning, TEXT("[AI] Attempting to damage target: %s"), *CurrentTarget->GetName());
+
+    float Distance = FVector::Dist(GetActorLocation(), CurrentTarget->GetActorLocation());
+
+    if (Distance <= AttackRange)
+    {
+        UHealthComponent* Health = CurrentTarget->FindComponentByClass<UHealthComponent>();
+
+        if (!Health)
+        {
+            UE_LOG(LogTemp, Error, TEXT("[AI] Target %s has NO HealthComponent!"), *CurrentTarget->GetName());
+            return;
+        }
+
+        Health->ApplyDamage(AttackDamage);
+
+        UE_LOG(LogTemp, Warning, TEXT("[AI] Enemy hit %s for %f damage"),
+            *CurrentTarget->GetName(),
+            AttackDamage
+        );
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[AI] Target %s is out of attack range (%.1f > %.1f)"),
+            *CurrentTarget->GetName(),
+            Distance,
+            AttackRange
+        );
+    }
+}
+
 void AARPGEnemyCharacter::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
+
+    TimeSinceLastAttack += DeltaTime;
 
     // --- NAVMESH CHECK ---
     UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(GetWorld());
@@ -222,11 +260,23 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
         }
     }
 
+    if (!CurrentTarget)
+        return;
+
+    float Distance = FVector::Dist(GetActorLocation(), CurrentTarget->GetActorLocation());
+
     // --- CHASE LOGIC ---
-    if (CurrentState == EEnemyState::Chase && CurrentTarget)
+    if (CurrentState == EEnemyState::Chase)
     {
-        AARPGEnemyAIController* AICon = GetEnemyAIController();
-        if (AICon)
+
+        // Switch to Attack if close enough
+        if (Distance <= AttackRange)
+        {
+            SetEnemyState(EEnemyState::Attack);
+            return;
+        }
+
+        if (AARPGEnemyAIController* AICon = GetEnemyAIController())
         {
             UE_LOG(LogTemp, Warning, TEXT("[AI] Calling MoveToActor"));
 
@@ -247,6 +297,29 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
                 UE_LOG(LogTemp, Warning, TEXT("[AI] MoveToActor: Request Successful"));
                 break;
             }
+        }
+    }
+
+    // --- ATTACK LOGIC ---
+    if (CurrentState == EEnemyState::Attack)
+    {
+        // If player moves away, go back to chase
+        if (Distance > AttackRange)
+        {
+            SetEnemyState(EEnemyState::Chase);
+            return;
+        }
+
+        // Face the player
+        FVector Dir = CurrentTarget->GetActorLocation() - GetActorLocation();
+        Dir.Z = 0;
+        SetActorRotation(Dir.Rotation());
+
+        // Attack if cooldown ready
+        if (TimeSinceLastAttack >= AttackCooldown)
+        {
+            PerformAttack();
+            TimeSinceLastAttack = 0.f;
         }
     }
 }

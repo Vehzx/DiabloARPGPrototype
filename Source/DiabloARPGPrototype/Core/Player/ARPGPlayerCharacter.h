@@ -57,4 +57,8 @@ private:
     void PerformTestAttack();
 
     void RotateTowardMouseCursor();
+
+    bool bIsDying = false;
+
+    float DeathShrinkSpeed = 1.5f;
 };
