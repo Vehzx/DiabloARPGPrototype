@@ -16,6 +16,7 @@ class DIABLOARPGPROTOTYPE_API AARPGPlayerCharacter : public ACharacter
 
 public:
     AARPGPlayerCharacter();
+    void FlashOnHit();
 
 protected:
     virtual void BeginPlay() override;

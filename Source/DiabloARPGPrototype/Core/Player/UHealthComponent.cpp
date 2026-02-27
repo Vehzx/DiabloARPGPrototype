@@ -1,4 +1,6 @@
 #include "DiabloARPGPrototype/Core/Player/UHealthComponent.h"
+#include "DiabloARPGPrototype/Core/AI/ARPGEnemyCharacter.h"
+#include "DiabloARPGPrototype/Core/Player/ARPGPlayerCharacter.h"
 #include "GameFramework/Actor.h"
 
 UHealthComponent::UHealthComponent()
@@ -32,6 +34,23 @@ void UHealthComponent::ApplyDamage(float DamageAmount)
         OldHealth,
         CurrentHealth
     );
+
+    // --- HIT FLASH HERE ---
+    if (AActor* Owner = GetOwner())
+    {
+        // Player
+        if (AARPGPlayerCharacter* Player = Cast<AARPGPlayerCharacter>(Owner))
+        {
+            Player->FlashOnHit();
+        }
+
+        // Enemy
+        else if (AARPGEnemyCharacter* Enemy = Cast<AARPGEnemyCharacter>(Owner))
+        {
+            Enemy->FlashOnHit();
+        }
+    }
+    // -----------------------
 
     OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
 

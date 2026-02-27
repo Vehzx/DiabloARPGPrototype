@@ -2,7 +2,7 @@
 #include "Camera/CameraActor.h"
 #include "NavigationSystem.h"
 #include "NavigationPath.h"
-#include "Navigation/PathFollowingComponent.h" // <-- ADD THIS
+#include "Navigation/PathFollowingComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
@@ -18,7 +18,6 @@
 #include "DiabloARPGPrototype/Core/Player/WHealthBarWidget.h"
 #include "DiabloARPGPrototype/Core/Camera/IsometricCameraPawn.h"
 #include "Components/WidgetComponent.h"
-
 #include "ARPGEnemyAIController.h"
 
 AARPGEnemyCharacter::AARPGEnemyCharacter()
@@ -92,6 +91,16 @@ AARPGEnemyCharacter::AARPGEnemyCharacter()
         BodyMesh->SetStaticMesh(CylinderMesh.Object);
         BodyMesh->SetRelativeScale3D(FVector(0.5f, 0.5f, 1.2f));
         BodyMesh->SetRelativeLocation(FVector(0.f, 0.f, -45.f));
+    }
+
+    // Apply the hit flash material
+    static ConstructorHelpers::FObjectFinder<UMaterialInterface> HitFlashMat(
+        TEXT("/Game/Materials/M_HitFlash.M_HitFlash")
+    );
+
+    if (HitFlashMat.Succeeded())
+    {
+        BodyMesh->SetMaterial(0, HitFlashMat.Object);
     }
 
     GetCapsuleComponent()->SetHiddenInGame(false);
@@ -239,6 +248,22 @@ void AARPGEnemyCharacter::PerformAttack()
             AttackRange
         );
     }
+}
+
+void AARPGEnemyCharacter::FlashOnHit()
+{
+    if (!BodyMesh) return;
+
+    BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(1.0f, 0.0f, 0.0f));
+
+    FTimerHandle TimerHandle;
+    GetWorldTimerManager().SetTimer(TimerHandle, [this]()
+        {
+            if (BodyMesh)
+            {
+                BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
+            }
+        }, 0.2f, false);
 }
 
 void AARPGEnemyCharacter::Tick(float DeltaTime)

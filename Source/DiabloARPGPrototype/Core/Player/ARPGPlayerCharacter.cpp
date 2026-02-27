@@ -28,8 +28,6 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
     Capsule->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
     Capsule->SetCollisionObjectType(ECC_Pawn);
     Capsule->SetCollisionResponseToAllChannels(ECR_Block);
-
-    // Optional: ignore camera traces
     Capsule->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
 
     // ============================================================
@@ -44,9 +42,8 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
     HealthBarWidgetComponent->SetupAttachment(RootComponent);
     HealthBarWidgetComponent->SetWidgetSpace(EWidgetSpace::Screen);
     HealthBarWidgetComponent->SetDrawSize(FVector2D(120.f, 12.f));
-    HealthBarWidgetComponent->SetRelativeLocation(FVector(0.f, 0.f, 120.f)); // above head
+    HealthBarWidgetComponent->SetRelativeLocation(FVector(0.f, 0.f, 120.f));
 
-    // Load the widget class
     static ConstructorHelpers::FClassFinder<UUserWidget> HealthBarClass(
         TEXT("/Game/UI/WBP_HealthBar.WBP_HealthBar_C")
     );
@@ -59,7 +56,6 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
     // ============================================================
     // Visual Mesh Setup
     // ============================================================
-
     BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh"));
     BodyMesh->SetupAttachment(GetCapsuleComponent());
 
@@ -71,10 +67,18 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
     if (CylinderMesh.Succeeded())
     {
         BodyMesh->SetStaticMesh(CylinderMesh.Object);
-
-        // Scale and position it to look like a humanoid placeholder
         BodyMesh->SetRelativeScale3D(FVector(0.5f, 0.5f, 1.2f));
         BodyMesh->SetRelativeLocation(FVector(0.f, 0.f, -45.f));
+    }
+
+    // Apply the hit flash material
+    static ConstructorHelpers::FObjectFinder<UMaterialInterface> HitFlashMat(
+        TEXT("/Game/Materials/M_HitFlash.M_HitFlash")
+    );
+
+    if (HitFlashMat.Succeeded())
+    {
+        BodyMesh->SetMaterial(0, HitFlashMat.Object);
     }
 
     // Optional: make capsule visible for debugging
@@ -173,6 +177,24 @@ void AARPGPlayerCharacter::RotateTowardMouseCursor()
             SetActorRotation(NewRot);
         }
     }
+}
+
+void AARPGPlayerCharacter::FlashOnHit()
+{
+    if (!BodyMesh) return;
+
+    // Flash red
+    BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(1.0f, 0.0f, 0.0f));
+
+    // Revert after short delay
+    FTimerHandle TimerHandle;
+    GetWorldTimerManager().SetTimer(TimerHandle, [this]()
+        {
+            if (BodyMesh)
+            {
+                BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
+            }
+        }, 0.2f, false);
 }
 
 void AARPGPlayerCharacter::Tick(float DeltaTime)

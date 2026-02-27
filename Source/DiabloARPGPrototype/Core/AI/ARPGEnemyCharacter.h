@@ -34,6 +34,7 @@ class DIABLOARPGPROTOTYPE_API AARPGEnemyCharacter : public ACharacter
 public:
     AARPGEnemyCharacter();
     virtual void Tick(float DeltaTime) override;
+    void FlashOnHit();
 
 protected:
     virtual void BeginPlay() override;
