@@ -131,7 +131,7 @@ void AARPGPlayerCharacter::PerformTestAttack()
             UHealthComponent* Health = HitActor->FindComponentByClass<UHealthComponent>();
             if (Health)
             {
-                Health->ApplyDamage(25.f);
+                Health->ApplyDamage(25.f, this);
                 UE_LOG(LogTemp, Warning, TEXT("Hit %s for 25 damage"), *HitActor->GetName());
             }
         }
@@ -195,6 +195,11 @@ void AARPGPlayerCharacter::FlashOnHit()
                 BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
             }
         }, 0.2f, false);
+}
+
+void AARPGPlayerCharacter::ApplyKnockback(const FVector& Direction, float Strength)
+{
+    LaunchCharacter(Direction * Strength, true, true);
 }
 
 void AARPGPlayerCharacter::Tick(float DeltaTime)

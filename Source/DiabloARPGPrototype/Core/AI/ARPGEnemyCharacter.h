@@ -35,6 +35,7 @@ public:
     AARPGEnemyCharacter();
     virtual void Tick(float DeltaTime) override;
     void FlashOnHit();
+    void ApplyKnockback(const FVector& Direction, float Strength);
 
 protected:
     virtual void BeginPlay() override;

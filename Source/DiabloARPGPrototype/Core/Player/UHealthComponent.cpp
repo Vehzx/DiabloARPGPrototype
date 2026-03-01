@@ -15,7 +15,7 @@ void UHealthComponent::BeginPlay()
     CurrentHealth = MaxHealth;
 }
 
-void UHealthComponent::ApplyDamage(float DamageAmount)
+void UHealthComponent::ApplyDamage(float DamageAmount, AActor* DamageCauser)
 {
     if (bIsDead || DamageAmount <= 0.f)
     {
@@ -24,39 +24,46 @@ void UHealthComponent::ApplyDamage(float DamageAmount)
         return;
     }
 
-    float OldHealth = CurrentHealth;
+    AActor* Owner = GetOwner();
+    if (!Owner)
+        return;
 
+    float OldHealth = CurrentHealth;
     CurrentHealth = FMath::Clamp(CurrentHealth - DamageAmount, 0.f, MaxHealth);
 
     UE_LOG(LogTemp, Warning, TEXT("[HEALTH] %s took %f damage. Health: %.1f -> %.1f"),
-        *GetOwner()->GetName(),
-        DamageAmount,
-        OldHealth,
-        CurrentHealth
-    );
+        *Owner->GetName(), DamageAmount, OldHealth, CurrentHealth);
 
-    // --- HIT FLASH HERE ---
-    if (AActor* Owner = GetOwner())
+    // Hit flash
+    if (AARPGPlayerCharacter* Player = Cast<AARPGPlayerCharacter>(Owner))
     {
-        // Player
+        Player->FlashOnHit();
+    }
+    else if (AARPGEnemyCharacter* Enemy = Cast<AARPGEnemyCharacter>(Owner))
+    {
+        Enemy->FlashOnHit();
+    }
+
+    // Knockback
+    if (DamageCauser)
+    {
+        FVector KnockDir = (Owner->GetActorLocation() - DamageCauser->GetActorLocation()).GetSafeNormal();
+
         if (AARPGPlayerCharacter* Player = Cast<AARPGPlayerCharacter>(Owner))
         {
-            Player->FlashOnHit();
+            Player->ApplyKnockback(KnockDir, 400.f);
         }
-
-        // Enemy
         else if (AARPGEnemyCharacter* Enemy = Cast<AARPGEnemyCharacter>(Owner))
         {
-            Enemy->FlashOnHit();
+            Enemy->ApplyKnockback(KnockDir, 300.f);
         }
     }
-    // -----------------------
 
     OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
 
     if (CurrentHealth <= 0.f)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[HEALTH] %s has died."), *GetOwner()->GetName());
+        UE_LOG(LogTemp, Warning, TEXT("[HEALTH] %s has died."), *Owner->GetName());
         HandleDeath();
     }
 }

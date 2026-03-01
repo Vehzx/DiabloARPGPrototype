@@ -233,7 +233,7 @@ void AARPGEnemyCharacter::PerformAttack()
             return;
         }
 
-        Health->ApplyDamage(AttackDamage);
+        Health->ApplyDamage(AttackDamage, this);
 
         UE_LOG(LogTemp, Warning, TEXT("[AI] Enemy hit %s for %f damage"),
             *CurrentTarget->GetName(),
@@ -264,6 +264,11 @@ void AARPGEnemyCharacter::FlashOnHit()
                 BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
             }
         }, 0.2f, false);
+}
+
+void AARPGEnemyCharacter::ApplyKnockback(const FVector& Direction, float Strength)
+{
+    LaunchCharacter(Direction * Strength, true, true);
 }
 
 void AARPGEnemyCharacter::Tick(float DeltaTime)

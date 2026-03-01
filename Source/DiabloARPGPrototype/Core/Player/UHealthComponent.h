@@ -22,7 +22,7 @@ public:
     // ------------------------------------------------------------
     // Health API
     // ------------------------------------------------------------
-    void ApplyDamage(float DamageAmount);
+    void ApplyDamage(float DamageAmount, AActor* DamageCauser);
     void Heal(float HealAmount);
 
     float GetHealth() const { return CurrentHealth; }
