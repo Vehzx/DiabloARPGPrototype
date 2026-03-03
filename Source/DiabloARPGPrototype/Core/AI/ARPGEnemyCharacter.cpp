@@ -104,6 +104,9 @@ AARPGEnemyCharacter::AARPGEnemyCharacter()
     }
 
     GetCapsuleComponent()->SetHiddenInGame(false);
+
+    // Ensure enemy starts with correct base colour (same as player)
+    BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
 }
 
 void AARPGEnemyCharacter::BeginPlay()
@@ -121,6 +124,11 @@ void AARPGEnemyCharacter::BeginPlay()
         {
             HB->InitializeHealth(HealthComponent);
         }
+    }
+
+    if (PatrolPoints.Num() > 0)
+    {
+        SetEnemyState(EEnemyState::Patrol);
     }
 }
 
@@ -145,24 +153,37 @@ void AARPGEnemyCharacter::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus S
     if (!Actor)
         return;
 
+    // Ignore camera actors and other enemies
     if (Actor->IsA(ACameraActor::StaticClass())) return;
     if (Actor->IsA(AIsometricCameraPawn::StaticClass())) return;
     if (Actor->IsA(AARPGEnemyCharacter::StaticClass())) return;
 
+    // --- PLAYER DETECTED ---
     if (Stimulus.WasSuccessfullySensed())
     {
         CurrentTarget = Actor;
 
-        // Only switch to Chase if not already attacking
-        if (CurrentState != EEnemyState::Attack)
+        // Only switch to Chase if not attacking or staggered
+        if (CurrentState != EEnemyState::Attack &&
+            CurrentState != EEnemyState::Stagger)
         {
             SetEnemyState(EEnemyState::Chase);
         }
     }
     else
     {
+        // --- PLAYER LOST ---
         CurrentTarget = nullptr;
-        SetEnemyState(EEnemyState::Idle);
+
+        // If we have patrol points, return to Patrol
+        if (PatrolPoints.Num() > 0)
+        {
+            SetEnemyState(EEnemyState::Patrol);
+        }
+        else
+        {
+            SetEnemyState(EEnemyState::Idle);
+        }
     }
 }
 
@@ -214,6 +235,12 @@ void AARPGEnemyCharacter::HandleStateChanged(EEnemyState OldState, EEnemyState N
     }
 }
 
+void AARPGEnemyCharacter::AdvancePatrol()
+{
+    CurrentPatrolIndex = (CurrentPatrolIndex + 1) % PatrolPoints.Num();
+    SetEnemyState(EEnemyState::Patrol);
+}
+
 void AARPGEnemyCharacter::PerformAttack()
 {
     if (!CurrentTarget)
@@ -253,6 +280,21 @@ void AARPGEnemyCharacter::PerformAttack()
     }
 }
 
+void AARPGEnemyCharacter::OnDamaged(AActor* DamageCauser)
+{
+    if (!DamageCauser || CurrentState == EEnemyState::Dead)
+        return;
+
+    // Set target to whoever hit us
+    CurrentTarget = DamageCauser;
+
+    // If not staggered, immediately chase
+    if (CurrentState != EEnemyState::Stagger)
+    {
+        SetEnemyState(EEnemyState::Chase);
+    }
+}
+
 void AARPGEnemyCharacter::FlashOnHit()
 {
     if (!BodyMesh) return;
@@ -266,7 +308,7 @@ void AARPGEnemyCharacter::FlashOnHit()
             {
                 BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
             }
-        }, 0.2f, false);
+        }, 0.8f, false);
 }
 
 void AARPGEnemyCharacter::ApplyKnockback(const FVector& Direction, float Strength)
@@ -276,8 +318,13 @@ void AARPGEnemyCharacter::ApplyKnockback(const FVector& Direction, float Strengt
 
 void AARPGEnemyCharacter::StartAttackWindup()
 {
-    // Attack telegraph, make enemy mesh orange when they enter attack state and wind up an attack.
-    BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(1.f, 0.5f, 0.f));
+    UE_LOG(LogTemp, Warning, TEXT("[AI] StartAttackWindup() CALLED — setting ORANGE"));
+
+    if (BodyMesh)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[AI] Setting BaseColour = ORANGE"));
+        BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(1.f, 0.5f, 0.f));
+    }
 
     GetWorldTimerManager().SetTimer(
         AttackWindupTimer,
@@ -290,9 +337,11 @@ void AARPGEnemyCharacter::StartAttackWindup()
 
 void AARPGEnemyCharacter::FinishWindupAndAttack()
 {
-    // Reset telegraph colour
+    UE_LOG(LogTemp, Warning, TEXT("[AI] FinishWindupAndAttack() CALLED — resetting to GREY"));
+
     if (BodyMesh)
     {
+        UE_LOG(LogTemp, Warning, TEXT("[AI] Setting BaseColour = GREY"));
         BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
     }
 
@@ -325,6 +374,42 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
         }
     }
 
+    // --- PATROL LOGIC ---
+    if (CurrentState == EEnemyState::Patrol)
+    {
+        if (PatrolPoints.Num() > 0)
+        {
+            AActor* PatrolTarget = PatrolPoints[CurrentPatrolIndex];
+            float PatrolDistance = FVector::Dist(GetActorLocation(), PatrolTarget->GetActorLocation());
+
+            // Move toward patrol point
+            if (PatrolDistance > 150.f)
+            {
+                if (AARPGEnemyAIController* AICon = GetEnemyAIController())
+                {
+                    AICon->MoveToActor(PatrolTarget, 5.f);
+                }
+            }
+            else
+            {
+                // Reached patrol point, wait, then move to next
+                GetCharacterMovement()->StopMovementImmediately();
+                SetEnemyState(EEnemyState::Idle);
+
+                GetWorldTimerManager().SetTimer(
+                    PatrolWaitTimer,
+                    this,
+                    &AARPGEnemyCharacter::AdvancePatrol,
+                    PatrolWaitTime,
+                    false
+                );
+            }
+        }
+
+        return; // Patrol does not continue into chase/attack logic
+    }
+
+    // If no target, nothing else to do
     if (!CurrentTarget)
         return;
 
@@ -415,11 +500,6 @@ void AARPGEnemyCharacter::EnterStagger(float Duration)
 
 void AARPGEnemyCharacter::ExitStagger()
 {
-    if (BodyMesh)
-    {
-        BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
-    }
-
     bIsStaggered = false;
 
     CurrentState = EEnemyState::Chase;

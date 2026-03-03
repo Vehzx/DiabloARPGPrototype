@@ -21,6 +21,7 @@ UENUM(BlueprintType)
 enum class EEnemyState : uint8
 {
     Idle,
+    Patrol,
     Chase,
     Attack,
     Stagger,
@@ -45,6 +46,9 @@ public:
 
     void EnterStagger(float Duration);
     void ExitStagger();
+
+    void OnDamaged(AActor* DamageCauser);
+
 
     float AttackCooldown = 1.0f;
 
@@ -96,6 +100,19 @@ private:
 
     void SetEnemyState(EEnemyState NewState);
     void HandleStateChanged(EEnemyState OldState, EEnemyState NewState);
+
+    // --- PATROL SYSTEM ---
+    UPROPERTY(EditAnywhere, Category = "AI")
+    TArray<AActor*> PatrolPoints;
+
+    int32 CurrentPatrolIndex = 0;
+
+    UPROPERTY(EditAnywhere, Category = "AI")
+    float PatrolWaitTime = 2.0f;
+
+    FTimerHandle PatrolWaitTimer;
+
+    void AdvancePatrol();
 
     // Combat
     UPROPERTY(EditAnywhere, Category = "Combat")

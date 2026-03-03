@@ -43,6 +43,9 @@ void UHealthComponent::ApplyDamage(float DamageAmount, AActor* DamageCauser)
     {
         Enemy->FlashOnHit();
         Enemy->EnterStagger(0.3f);
+
+        // Tell the enemy who damaged it
+        Enemy->OnDamaged(DamageCauser);
     }
 
     // Knockback
