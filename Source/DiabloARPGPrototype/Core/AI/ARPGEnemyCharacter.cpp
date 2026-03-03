@@ -168,6 +168,9 @@ void AARPGEnemyCharacter::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus S
 
 void AARPGEnemyCharacter::SetEnemyState(EEnemyState NewState)
 {
+    if (bIsStaggered && NewState != EEnemyState::Stagger)
+        return;
+
     if (CurrentState == NewState)
         return;
 
@@ -275,6 +278,13 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
 
+    // --- STAGGER LOCKOUT ---
+    if (bIsStaggered)
+    {
+        // Enemy is stunned; do nothing this frame
+        return;
+    }
+
     TimeSinceLastAttack += DeltaTime;
 
     // --- NAVMESH CHECK ---
@@ -298,7 +308,6 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
     // --- CHASE LOGIC ---
     if (CurrentState == EEnemyState::Chase)
     {
-
         // Switch to Attack if close enough
         if (Distance <= AttackRange)
         {
@@ -352,4 +361,35 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
             TimeSinceLastAttack = 0.f;
         }
     }
+}
+
+void AARPGEnemyCharacter::EnterStagger(float Duration)
+{
+    if (bIsStaggered)
+        return;
+
+    bIsStaggered = true;
+
+    // Stop movement immediately
+    GetCharacterMovement()->StopMovementImmediately();
+
+    // Cancel any attack wind-up or behaviour
+    CurrentState = EEnemyState::Stagger;
+
+    // Timer to exit stagger
+    GetWorldTimerManager().SetTimer(
+        StaggerTimerHandle,
+        this,
+        &AARPGEnemyCharacter::ExitStagger,
+        Duration,
+        false
+    );
+}
+
+void AARPGEnemyCharacter::ExitStagger()
+{
+    bIsStaggered = false;
+
+    // Return to normal behaviour
+    CurrentState = EEnemyState::Chase;
 }

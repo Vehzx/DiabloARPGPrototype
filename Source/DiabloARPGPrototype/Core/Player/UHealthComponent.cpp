@@ -42,6 +42,7 @@ void UHealthComponent::ApplyDamage(float DamageAmount, AActor* DamageCauser)
     else if (AARPGEnemyCharacter* Enemy = Cast<AARPGEnemyCharacter>(Owner))
     {
         Enemy->FlashOnHit();
+        Enemy->EnterStagger(0.3f);
     }
 
     // Knockback

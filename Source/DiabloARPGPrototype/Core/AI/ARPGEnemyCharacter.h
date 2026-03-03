@@ -23,6 +23,7 @@ enum class EEnemyState : uint8
     Idle,
     Chase,
     Attack,
+    Stagger,
     Dead
 };
 
@@ -36,6 +37,18 @@ public:
     virtual void Tick(float DeltaTime) override;
     void FlashOnHit();
     void ApplyKnockback(const FVector& Direction, float Strength);
+
+    UPROPERTY(VisibleAnywhere, Category = "Combat")
+    bool bIsStaggered = false;
+
+    FTimerHandle StaggerTimerHandle;
+
+    void EnterStagger(float Duration);
+    void ExitStagger();
+
+    float AttackCooldown = 1.0f;
+
+    float TimeSinceLastAttack = 0.f;
 
 protected:
     virtual void BeginPlay() override;
@@ -91,10 +104,6 @@ private:
     UPROPERTY(EditAnywhere, Category = "Combat")
     float AttackDamage = 10.f;
 
-    UPROPERTY(EditAnywhere, Category = "Combat")
-    float AttackCooldown = 1.0f;
-
-    float TimeSinceLastAttack = 0.f;
-
+    UFUNCTION()
     void PerformAttack();
 };
