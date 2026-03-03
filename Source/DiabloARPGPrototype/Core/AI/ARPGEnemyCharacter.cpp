@@ -274,6 +274,31 @@ void AARPGEnemyCharacter::ApplyKnockback(const FVector& Direction, float Strengt
     LaunchCharacter(Direction * Strength, true, true);
 }
 
+void AARPGEnemyCharacter::StartAttackWindup()
+{
+    // Attack telegraph, make enemy mesh orange when they enter attack state and wind up an attack.
+    BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(1.f, 0.5f, 0.f));
+
+    GetWorldTimerManager().SetTimer(
+        AttackWindupTimer,
+        this,
+        &AARPGEnemyCharacter::FinishWindupAndAttack,
+        AttackWindupTime,
+        false
+    );
+}
+
+void AARPGEnemyCharacter::FinishWindupAndAttack()
+{
+    // Reset telegraph colour
+    if (BodyMesh)
+    {
+        BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
+    }
+
+    PerformAttack();
+}
+
 void AARPGEnemyCharacter::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
@@ -281,7 +306,7 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
     // --- STAGGER LOCKOUT ---
     if (bIsStaggered)
     {
-        // Enemy is stunned; do nothing this frame
+        // Enemy is stunned, do nothing this frame
         return;
     }
 
@@ -357,7 +382,7 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
         // Attack if cooldown ready
         if (TimeSinceLastAttack >= AttackCooldown)
         {
-            PerformAttack();
+            StartAttackWindup();
             TimeSinceLastAttack = 0.f;
         }
     }
@@ -373,8 +398,10 @@ void AARPGEnemyCharacter::EnterStagger(float Duration)
     // Stop movement immediately
     GetCharacterMovement()->StopMovementImmediately();
 
-    // Cancel any attack wind-up or behaviour
+    // Cancel any attack wind up or behaviour when staggered
     CurrentState = EEnemyState::Stagger;
+
+    GetWorldTimerManager().ClearTimer(AttackWindupTimer);
 
     // Timer to exit stagger
     GetWorldTimerManager().SetTimer(
@@ -388,8 +415,12 @@ void AARPGEnemyCharacter::EnterStagger(float Duration)
 
 void AARPGEnemyCharacter::ExitStagger()
 {
+    if (BodyMesh)
+    {
+        BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
+    }
+
     bIsStaggered = false;
 
-    // Return to normal behaviour
     CurrentState = EEnemyState::Chase;
 }

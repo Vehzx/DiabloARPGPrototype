@@ -104,6 +104,15 @@ private:
     UPROPERTY(EditAnywhere, Category = "Combat")
     float AttackDamage = 10.f;
 
+    UPROPERTY(EditAnywhere, Category = "Combat")
+    float AttackWindupTime = 0.5f;
+
+    FTimerHandle AttackWindupTimer;
+
+    void StartAttackWindup();
+    void FinishWindupAndAttack();
+
+
     UFUNCTION()
     void PerformAttack();
 };
