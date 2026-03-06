@@ -507,12 +507,6 @@ void AARPGEnemyCharacter::HandleLeashReset()
     // Clear any attack windup
     GetWorldTimerManager().ClearTimer(AttackWindupTimer);
 
-    // Reset state
-    CurrentState = EEnemyState::Patrol;
-
-    // Teleport or MoveTo spawn (choose one)
-    SetActorLocation(SpawnLocation);
-
     // Optional: reset colour
     BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
 }
