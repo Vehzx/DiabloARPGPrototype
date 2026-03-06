@@ -112,6 +112,7 @@ AARPGEnemyCharacter::AARPGEnemyCharacter()
 void AARPGEnemyCharacter::BeginPlay()
 {
     Super::BeginPlay();
+    SpawnLocation = GetActorLocation();
 
     if (HealthComponent)
     {
@@ -174,6 +175,12 @@ void AARPGEnemyCharacter::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus S
     {
         // --- PLAYER LOST ---
         CurrentTarget = nullptr;
+
+        // Heal when returning to patrol
+        if (HealthComponent)
+        {
+            HealthComponent->ResetHealthToFull();
+        }
 
         // If we have patrol points, return to Patrol
         if (PatrolPoints.Num() > 0)
@@ -418,6 +425,14 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
     // --- CHASE LOGIC ---
     if (CurrentState == EEnemyState::Chase)
     {
+        // --- LEASH CHECK ---
+        float DistanceFromSpawn = FVector::Dist(GetActorLocation(), SpawnLocation);
+        if (DistanceFromSpawn > LeashRadius)
+        {
+            HandleLeashReset();
+            return;
+        }
+
         // Switch to Attack if close enough
         if (Distance <= AttackRange)
         {
@@ -452,6 +467,14 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
     // --- ATTACK LOGIC ---
     if (CurrentState == EEnemyState::Attack)
     {
+        // --- LEASH CHECK ---
+        float DistanceFromSpawn = FVector::Dist(GetActorLocation(), SpawnLocation);
+        if (DistanceFromSpawn > LeashRadius)
+        {
+            HandleLeashReset();
+            return;
+        }
+
         // If player moves away, go back to chase
         if (Distance > AttackRange)
         {
@@ -471,6 +494,27 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
             TimeSinceLastAttack = 0.f;
         }
     }
+}
+
+void AARPGEnemyCharacter::HandleLeashReset()
+{
+    // Heal to full
+    if (HealthComponent)
+    {
+        HealthComponent->ResetHealthToFull();
+    }
+
+    // Clear any attack windup
+    GetWorldTimerManager().ClearTimer(AttackWindupTimer);
+
+    // Reset state
+    CurrentState = EEnemyState::Patrol;
+
+    // Teleport or MoveTo spawn (choose one)
+    SetActorLocation(SpawnLocation);
+
+    // Optional: reset colour
+    BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
 }
 
 void AARPGEnemyCharacter::EnterStagger(float Duration)

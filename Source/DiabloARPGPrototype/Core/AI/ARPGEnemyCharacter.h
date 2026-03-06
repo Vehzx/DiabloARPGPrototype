@@ -57,6 +57,12 @@ public:
 protected:
     virtual void BeginPlay() override;
 
+    // LEASHING SYSTEM
+    FVector SpawnLocation;
+    float LeashRadius = 1500.f;
+
+    void HandleLeashReset();
+
 private:
 
     // Components
@@ -101,7 +107,7 @@ private:
     void SetEnemyState(EEnemyState NewState);
     void HandleStateChanged(EEnemyState OldState, EEnemyState NewState);
 
-    // --- PATROL SYSTEM ---
+    // PATROL SYSTEM
     UPROPERTY(EditAnywhere, Category = "AI")
     TArray<AActor*> PatrolPoints;
 

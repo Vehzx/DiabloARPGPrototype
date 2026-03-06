@@ -81,6 +81,12 @@ void UHealthComponent::Heal(float HealAmount)
     OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
 }
 
+void UHealthComponent::ResetHealthToFull()
+{
+    CurrentHealth = MaxHealth;
+    OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
+}
+
 void UHealthComponent::HandleDeath()
 {
     if (bIsDead)
