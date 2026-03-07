@@ -179,7 +179,13 @@ void AARPGEnemyCharacter::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus S
         // Heal when returning to patrol
         if (HealthComponent)
         {
-            HealthComponent->ResetHealthToFull();
+            GetWorldTimerManager().SetTimer(
+                HealOverTimeTimer,
+                this,
+                &AARPGEnemyCharacter::HealOverTimeTick,
+                0.2f,   // tick rate
+                true    // looping
+            );
         }
 
         // If we have patrol points, return to Patrol
@@ -496,12 +502,32 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
     }
 }
 
+void AARPGEnemyCharacter::HealOverTimeTick()
+{
+    if (!HealthComponent) return;
+
+    // Heal amount per tick (tweak as needed)
+    HealthComponent->Heal(5.f);
+
+    // Stop healing when full
+    if (HealthComponent->GetHealth() >= HealthComponent->GetMaxHealth())
+    {
+        GetWorldTimerManager().ClearTimer(HealOverTimeTimer);
+    }
+}
+
 void AARPGEnemyCharacter::HandleLeashReset()
 {
     // Heal to full
     if (HealthComponent)
     {
-        HealthComponent->ResetHealthToFull();
+        GetWorldTimerManager().SetTimer(
+            HealOverTimeTimer,
+            this,
+            &AARPGEnemyCharacter::HealOverTimeTick,
+            0.2f,   // tick rate
+            true    // looping
+        );
     }
 
     // Clear any attack windup

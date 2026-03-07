@@ -100,7 +100,6 @@ private:
     UPROPERTY(VisibleAnywhere, Category = "AI")
     EEnemyState CurrentState = EEnemyState::Idle;
 
-    // Current target the enemy is chasing
     UPROPERTY()
     AActor* CurrentTarget = nullptr;
 
@@ -138,4 +137,8 @@ private:
 
     UFUNCTION()
     void PerformAttack();
+
+    // Healing
+    FTimerHandle HealOverTimeTimer;
+    void HealOverTimeTick();
 };
