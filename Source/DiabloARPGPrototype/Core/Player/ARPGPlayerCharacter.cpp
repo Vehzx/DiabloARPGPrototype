@@ -188,19 +188,24 @@ void AARPGPlayerCharacter::Dash()
 
 void AARPGPlayerCharacter::PerformTestAttack()
 {
-    // NEW: Rotate player toward mouse cursor before attacking
+    if (!bCanAttack)
+        return;
+
+    bCanAttack = false;
+
+    // Rotate toward cursor (your existing logic)
     RotateTowardMouseCursor();
 
-    FVector Start = GetActorLocation() + FVector(0, 0, 50.f); // chest height
+    // Your existing hitbox trace
+    FVector Start = GetActorLocation() + FVector(0, 0, 50.f);
     FVector Forward = GetActorForwardVector();
-    FVector End = Start + Forward * 200.f; // Attack range
+    FVector End = Start + Forward * 200.f;
 
     float Radius = 60.f;
-
     FCollisionShape Sphere = FCollisionShape::MakeSphere(Radius);
 
     FCollisionQueryParams Params;
-    Params.AddIgnoredActor(this); // Ignore the player
+    Params.AddIgnoredActor(this);
 
     FHitResult Hit;
     bool bHit = GetWorld()->SweepSingleByChannel(
@@ -219,17 +224,26 @@ void AARPGPlayerCharacter::PerformTestAttack()
 
     if (bHit)
     {
-        AActor* HitActor = Hit.GetActor();
-        if (HitActor)
+        if (AActor* HitActor = Hit.GetActor())
         {
-            UHealthComponent* Health = HitActor->FindComponentByClass<UHealthComponent>();
-            if (Health)
+            if (UHealthComponent* Health = HitActor->FindComponentByClass<UHealthComponent>())
             {
                 Health->ApplyDamage(25.f, this);
                 UE_LOG(LogTemp, Warning, TEXT("Hit %s for 25 damage"), *HitActor->GetName());
             }
         }
     }
+
+    // Start cooldown
+    GetWorldTimerManager().SetTimer(
+        AttackCooldownTimer,
+        [this]()
+        {
+            bCanAttack = true;
+        },
+        AttackCooldown,
+        false
+    );
 }
 
 void AARPGPlayerCharacter::BeginPlay()

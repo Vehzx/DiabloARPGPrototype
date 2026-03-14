@@ -87,4 +87,16 @@ private:
     bool bIsDying = false;
 
     float DeathShrinkSpeed = 1.5f;
+
+    // ============================================================
+    // Combat
+    // ============================================================
+
+    UPROPERTY(EditAnywhere, Category = "Combat")
+    float AttackCooldown = 0.8f;
+
+    bool bCanAttack = true;
+
+    FTimerHandle AttackCooldownTimer;
+
 };
