@@ -82,6 +82,19 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
         BodyMesh->SetMaterial(0, HitFlashMat.Object);
     }
 
+    // ============================================================
+    // Camera Shake Setup
+    // ============================================================
+    static ConstructorHelpers::FClassFinder<UCameraShakeBase> ShakeClassFinder(
+        TEXT("/Game/Camera/Shakes/BP_HitCameraShake")
+    );
+
+    if (ShakeClassFinder.Succeeded())
+    {
+        HitCameraShake = ShakeClassFinder.Class;
+    }
+
+
     // Optional: make capsule visible for debugging
     GetCapsuleComponent()->SetHiddenInGame(false);
 }
@@ -230,6 +243,11 @@ void AARPGPlayerCharacter::PerformTestAttack()
             {
                 Health->ApplyDamage(25.f, this);
                 UE_LOG(LogTemp, Warning, TEXT("Hit %s for 25 damage"), *HitActor->GetName());
+
+                if (APlayerController* PC = Cast<APlayerController>(GetController()))
+                {
+                    PC->PlayerCameraManager->StartCameraShake(HitCameraShake);
+                }
             }
         }
     }

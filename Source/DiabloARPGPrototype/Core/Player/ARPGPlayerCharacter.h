@@ -8,6 +8,7 @@
 class UStaticMeshComponent;
 class UHealthComponent;
 class UWidgetComponent;
+class UCameraShakeBase;
 
 UCLASS()
 class DIABLOARPGPROTOTYPE_API AARPGPlayerCharacter : public ACharacter
@@ -51,6 +52,9 @@ protected:
 
     FTimerHandle DashTimer;
     FTimerHandle DashCooldownTimer;
+
+    UPROPERTY(EditAnywhere, Category = "Camera")
+    TSubclassOf<UCameraShakeBase> HitCameraShake;
 
 private:
 
