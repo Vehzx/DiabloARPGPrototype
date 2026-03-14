@@ -32,23 +32,4 @@ void AARPGPlayerController::BeginPlay()
 void AARPGPlayerController::SetupInputComponent()
 {
     Super::SetupInputComponent();
-
-    InputComponent->BindAxis("MoveForward", this, &AARPGPlayerController::MoveForward);
-    InputComponent->BindAxis("MoveRight", this, &AARPGPlayerController::MoveRight);
-}
-
-void AARPGPlayerController::MoveForward(float Value)
-{
-    if (APawn* P = GetPawn())
-    {
-        P->AddMovementInput(P->GetActorForwardVector(), Value);
-    }
-}
-
-void AARPGPlayerController::MoveRight(float Value)
-{
-    if (APawn* P = GetPawn())
-    {
-        P->AddMovementInput(P->GetActorRightVector(), Value);
-    }
 }

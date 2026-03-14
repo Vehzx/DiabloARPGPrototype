@@ -18,15 +18,39 @@ public:
     AARPGPlayerCharacter();
     void FlashOnHit();
 
+    virtual void Tick(float DeltaTime) override;
+    void ApplyKnockback(const FVector& Direction, float Strength);
+
 protected:
     virtual void BeginPlay() override;
 
     /** Input bindings */
     virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
-public:
-    virtual void Tick(float DeltaTime) override;
-    void ApplyKnockback(const FVector& Direction, float Strength);
+    /* Movement */
+    void MoveForward(float Value);
+    void MoveRight(float Value);
+
+    FVector GetMovementDirection() const;
+
+    FVector LastMoveDirection = FVector::ZeroVector;
+
+    void Dash();
+
+    UPROPERTY(EditAnywhere, Category = "Movement")
+    float DashDistance = 1200.f;
+
+    UPROPERTY(EditAnywhere, Category = "Movement")
+    float DashDuration = 0.12f;
+
+    UPROPERTY(EditAnywhere, Category = "Movement")
+    float DashCooldown = 0.5f;
+
+    bool bIsDashing = false;
+    bool bDashOnCooldown = false;
+
+    FTimerHandle DashTimer;
+    FTimerHandle DashCooldownTimer;
 
 private:
 
@@ -50,7 +74,7 @@ private:
     // Internal Functions
     // ============================================================
 
-    /** Called when the player dies */
+    /* Called when the player dies */
     UFUNCTION()
     void HandleDeath();
 

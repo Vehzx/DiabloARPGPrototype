@@ -17,7 +17,8 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
     if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
     {
         MoveComp->MaxWalkSpeed = 600.f;
-        MoveComp->bOrientRotationToMovement = true;
+        MoveComp->bOrientRotationToMovement = false;
+        bUseControllerRotationYaw = false;
         MoveComp->RotationRate = FRotator(0.f, 540.f, 0.f);
     }
 
@@ -89,7 +90,100 @@ void AARPGPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 {
     Super::SetupPlayerInputComponent(PlayerInputComponent);
 
+    PlayerInputComponent->BindAxis("MoveForward", this, &AARPGPlayerCharacter::MoveForward);
+    PlayerInputComponent->BindAxis("MoveRight", this, &AARPGPlayerCharacter::MoveRight);
+
     PlayerInputComponent->BindAction("TestAttack", IE_Pressed, this, &AARPGPlayerCharacter::PerformTestAttack);
+    PlayerInputComponent->BindAction("Dash", IE_Pressed, this, &AARPGPlayerCharacter::Dash);
+}
+
+FVector AARPGPlayerCharacter::GetMovementDirection() const
+{
+    FVector Input = GetLastMovementInputVector();
+    if (!Input.IsNearlyZero())
+    {
+        return Input.GetSafeNormal();
+    }
+
+    // If not moving, dash in facing direction
+    FVector Forward = GetActorForwardVector();
+    Forward.Z = 0;
+    return Forward.GetSafeNormal();
+}
+
+void AARPGPlayerCharacter::MoveForward(float Value)
+{
+    UE_LOG(LogTemp, Warning, TEXT("[MOVE] MoveForward Value: %f"), Value);
+
+    LastMoveDirection.X = Value; // always update, even when 0
+
+    AddMovementInput(FVector::ForwardVector, Value);
+}
+
+void AARPGPlayerCharacter::MoveRight(float Value)
+{
+    UE_LOG(LogTemp, Warning, TEXT("[MOVE] MoveRight Value: %f"), Value);
+
+    LastMoveDirection.Y = Value; // always update, even when 0
+
+    AddMovementInput(FVector::RightVector, Value);
+}
+
+void AARPGPlayerCharacter::Dash()
+{
+    if (bIsDashing || bDashOnCooldown)
+        return;
+
+    bIsDashing = true;
+    bDashOnCooldown = true;
+
+    FVector DashDirection;
+
+    if (!LastMoveDirection.IsNearlyZero())
+        DashDirection = FVector(LastMoveDirection.X, LastMoveDirection.Y, 0.f).GetSafeNormal();
+    else
+    {
+        DashDirection = GetActorForwardVector();
+        DashDirection.Z = 0;
+        DashDirection.Normalize();
+    }
+
+    // Disable friction for smooth dash
+    UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+    MoveComp->GroundFriction = 0.f;
+    MoveComp->BrakingFrictionFactor = 0.f;
+    MoveComp->BrakingDecelerationWalking = 0.f;
+
+    // Apply dash velocity
+    LaunchCharacter(DashDirection * DashDistance, true, true);
+
+    // End dash
+    GetWorldTimerManager().SetTimer(
+        DashTimer,
+        [this]()
+        {
+            bIsDashing = false;
+
+            // Restore movement friction
+            UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+            MoveComp->GroundFriction = 8.f;
+            MoveComp->BrakingFrictionFactor = 2.f;
+            MoveComp->BrakingDecelerationWalking = 2048.f;
+        },
+        DashDuration,
+        false
+    );
+
+    // Cooldown
+    GetWorldTimerManager().SetTimer(
+        DashCooldownTimer,
+        [this]()
+        {
+            bDashOnCooldown = false;
+        },
+        DashCooldown,
+        false
+    );
 }
 
 void AARPGPlayerCharacter::PerformTestAttack()

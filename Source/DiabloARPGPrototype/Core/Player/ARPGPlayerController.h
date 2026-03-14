@@ -21,6 +21,4 @@ protected:
     virtual void SetupInputComponent() override;
 
 private:
-    void MoveForward(float Value);
-    void MoveRight(float Value);
 };
