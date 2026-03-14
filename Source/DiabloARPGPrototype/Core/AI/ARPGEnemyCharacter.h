@@ -63,6 +63,9 @@ protected:
 
     void HandleLeashReset();
 
+    FTimerHandle LostSightTimer;
+    bool bPlayerReallyLost = false;
+
 private:
 
     // Components

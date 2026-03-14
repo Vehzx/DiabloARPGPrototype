@@ -1,4 +1,4 @@
-#include "ARPGEnemyCharacter.h"
+ï»¿#include "ARPGEnemyCharacter.h"
 #include "Camera/CameraActor.h"
 #include "NavigationSystem.h"
 #include "NavigationPath.h"
@@ -19,6 +19,7 @@
 #include "DiabloARPGPrototype/Core/Camera/IsometricCameraPawn.h"
 #include "Components/WidgetComponent.h"
 #include "ARPGEnemyAIController.h"
+#include "EngineUtils.h"
 
 AARPGEnemyCharacter::AARPGEnemyCharacter()
 {
@@ -55,24 +56,19 @@ AARPGEnemyCharacter::AARPGEnemyCharacter()
     PerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("PerceptionComponent"));
 
     SightConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightConfig"));
-    HearingConfig = CreateDefaultSubobject<UAISenseConfig_Hearing>(TEXT("HearingConfig"));
     DamageConfig = CreateDefaultSubobject<UAISenseConfig_Damage>(TEXT("DamageConfig"));
 
-    SightConfig->SightRadius = 1200.f;
-    SightConfig->LoseSightRadius = 1500.f;
-    SightConfig->PeripheralVisionAngleDegrees = 70.f;
-    SightConfig->SetMaxAge(2.f);
+    SightConfig->SightRadius = 800.f;
+    SightConfig->LoseSightRadius = 810.f;
+    SightConfig->PeripheralVisionAngleDegrees = 50.f;
+    SightConfig->SetMaxAge(0.2f);
     SightConfig->DetectionByAffiliation.bDetectEnemies = true;
     SightConfig->DetectionByAffiliation.bDetectFriendlies = true;
     SightConfig->DetectionByAffiliation.bDetectNeutrals = true;
 
-    HearingConfig->HearingRange = 1500.f;
-    HearingConfig->SetMaxAge(2.f);
-
-    DamageConfig->SetMaxAge(2.f);
+    DamageConfig->SetMaxAge(0.2f);
 
     PerceptionComponent->ConfigureSense(*SightConfig);
-    PerceptionComponent->ConfigureSense(*HearingConfig);
     PerceptionComponent->ConfigureSense(*DamageConfig);
     PerceptionComponent->SetDominantSense(SightConfig->GetSenseImplementation());
 
@@ -104,15 +100,27 @@ AARPGEnemyCharacter::AARPGEnemyCharacter()
     }
 
     GetCapsuleComponent()->SetHiddenInGame(false);
-
-    // Ensure enemy starts with correct base colour (same as player)
-    BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
 }
 
 void AARPGEnemyCharacter::BeginPlay()
 {
     Super::BeginPlay();
     SpawnLocation = GetActorLocation();
+
+    for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+    {
+        if (It->ActorHasTag("PatrolPoint"))
+        {
+            PatrolPoints.Add(*It);
+            UE_LOG(LogTemp, Warning, TEXT("[PATROL] Added patrol point: %s"), *It->GetName());
+        }
+    }
+
+    UE_LOG(LogTemp, Warning, TEXT("PatrolPoints.Num() at runtime = %d"), PatrolPoints.Num());
+
+
+    // Ensure enemy starts with correct base colour (same as player)
+    BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
 
     if (HealthComponent)
     {
@@ -162,6 +170,13 @@ void AARPGEnemyCharacter::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus S
     // --- PLAYER DETECTED ---
     if (Stimulus.WasSuccessfullySensed())
     {
+        // Cancel ANY pending "lost sight" logic
+        GetWorldTimerManager().ClearTimer(LostSightTimer);
+        bPlayerReallyLost = false;
+
+        // Cancel patrol timer IMMEDIATELY
+        GetWorldTimerManager().ClearTimer(PatrolWaitTimer);
+
         CurrentTarget = Actor;
 
         // Only switch to Chase if not attacking or staggered
@@ -170,34 +185,52 @@ void AARPGEnemyCharacter::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus S
         {
             SetEnemyState(EEnemyState::Chase);
         }
-    }
-    else
-    {
-        // --- PLAYER LOST ---
-        CurrentTarget = nullptr;
 
-        // Heal when returning to patrol
-        if (HealthComponent)
-        {
-            GetWorldTimerManager().SetTimer(
-                HealOverTimeTimer,
-                this,
-                &AARPGEnemyCharacter::HealOverTimeTick,
-                0.2f,   // tick rate
-                true    // looping
-            );
-        }
-
-        // If we have patrol points, return to Patrol
-        if (PatrolPoints.Num() > 0)
-        {
-            SetEnemyState(EEnemyState::Patrol);
-        }
-        else
-        {
-            SetEnemyState(EEnemyState::Idle);
-        }
+        return;
     }
+
+    // --- PLAYER LOST (but maybe only for a moment) ---
+    GetWorldTimerManager().ClearTimer(LostSightTimer);
+
+    // Mark target as lost immediately
+    CurrentTarget = nullptr;
+
+    GetWorldTimerManager().SetTimer(
+        LostSightTimer,
+        [this]()
+        {
+            bPlayerReallyLost = true;
+
+            // Only clear target if still no sight
+            if (!CurrentTarget)
+            {
+                UE_LOG(LogTemp, Warning, TEXT("[AI] Player REALLY lost â€” returning to patrol"));
+
+                // Heal when returning to patrol
+                if (HealthComponent)
+                {
+                    GetWorldTimerManager().SetTimer(
+                        HealOverTimeTimer,
+                        this,
+                        &AARPGEnemyCharacter::HealOverTimeTick,
+                        0.2f,
+                        true
+                    );
+                }
+
+                if (PatrolPoints.Num() > 0)
+                {
+                    SetEnemyState(EEnemyState::Patrol);
+                }
+                else
+                {
+                    SetEnemyState(EEnemyState::Idle);
+                }
+            }
+        },
+        0.5f,   // half-second grace period
+        false
+    );
 }
 
 void AARPGEnemyCharacter::SetEnemyState(EEnemyState NewState)
@@ -235,12 +268,25 @@ void AARPGEnemyCharacter::HandleStateChanged(EEnemyState OldState, EEnemyState N
     }
 
     case EEnemyState::Chase:
+    {
         UE_LOG(LogTemp, Warning, TEXT("[AI] Entered CHASE state"));
+
+        if (AARPGEnemyAIController* AICon = GetEnemyAIController())
+        {
+            AICon->StopMovement();
+        }
+
+        // Cancel any pending patrol timer
+        GetWorldTimerManager().ClearTimer(PatrolWaitTimer);
+
         break;
+    }
 
     case EEnemyState::Attack:
-        UE_LOG(LogTemp, Warning, TEXT("[AI] Entered ATTACK state"));
+    {
+        GetWorldTimerManager().ClearTimer(PatrolWaitTimer);
         break;
+    }
 
     case EEnemyState::Dead:
         UE_LOG(LogTemp, Warning, TEXT("[AI] Entered DEAD state"));
@@ -250,8 +296,51 @@ void AARPGEnemyCharacter::HandleStateChanged(EEnemyState OldState, EEnemyState N
 
 void AARPGEnemyCharacter::AdvancePatrol()
 {
+    // Abort AdvancePatrol ONLY if in combat states
+    if (CurrentState == EEnemyState::Chase ||
+        CurrentState == EEnemyState::Attack ||
+        CurrentState == EEnemyState::Stagger ||
+        CurrentState == EEnemyState::Dead)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[PATROL] AdvancePatrol ABORTED â€” AI in combat state (%s)"),
+            *UEnum::GetValueAsString(CurrentState));
+        return;
+    }
+
+    // Never advance patrol if we currently have a target
+    if (CurrentTarget)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[PATROL] AdvancePatrol BLOCKED because CurrentTarget is valid (%s)"),
+            *GetNameSafe(CurrentTarget));
+        return;
+    }
+
+    UE_LOG(LogTemp, Warning, TEXT("[PATROL] Advancing patrol point. Old index: %d"), CurrentPatrolIndex);
+
     CurrentPatrolIndex = (CurrentPatrolIndex + 1) % PatrolPoints.Num();
-    SetEnemyState(EEnemyState::Patrol);
+
+    UE_LOG(LogTemp, Warning, TEXT("[PATROL] New patrol index: %d"), CurrentPatrolIndex);
+
+    if (PatrolPoints.IsValidIndex(CurrentPatrolIndex))
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[PATROL] New patrol target: %s"),
+            *GetNameSafe(PatrolPoints[CurrentPatrolIndex]));
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("[PATROL] INVALID patrol index after advance!"));
+        return;
+    }
+
+    // We should only enter Patrol if we still have no target
+    if (!CurrentTarget)
+    {
+        SetEnemyState(EEnemyState::Patrol);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[PATROL] Patrol state NOT set because target exists"));
+    }
 }
 
 void AARPGEnemyCharacter::PerformAttack()
@@ -331,7 +420,7 @@ void AARPGEnemyCharacter::ApplyKnockback(const FVector& Direction, float Strengt
 
 void AARPGEnemyCharacter::StartAttackWindup()
 {
-    UE_LOG(LogTemp, Warning, TEXT("[AI] StartAttackWindup() CALLED — setting ORANGE"));
+    UE_LOG(LogTemp, Warning, TEXT("[AI] StartAttackWindup() CALLED ï¿½ setting ORANGE"));
 
     if (BodyMesh)
     {
@@ -350,7 +439,7 @@ void AARPGEnemyCharacter::StartAttackWindup()
 
 void AARPGEnemyCharacter::FinishWindupAndAttack()
 {
-    UE_LOG(LogTemp, Warning, TEXT("[AI] FinishWindupAndAttack() CALLED — resetting to GREY"));
+    UE_LOG(LogTemp, Warning, TEXT("[AI] FinishWindupAndAttack() CALLED ï¿½ resetting to GREY"));
 
     if (BodyMesh)
     {
