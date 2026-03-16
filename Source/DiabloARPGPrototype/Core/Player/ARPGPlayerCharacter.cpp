@@ -69,7 +69,7 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
     {
         BodyMesh->SetStaticMesh(CylinderMesh.Object);
         BodyMesh->SetRelativeScale3D(FVector(0.5f, 0.5f, 1.2f));
-        BodyMesh->SetRelativeLocation(FVector(0.f, 0.f, -45.f));
+        BodyMesh->SetRelativeLocation(FVector(0.f, 0.f, 5.f));
     }
 
     // Apply the hit flash material
