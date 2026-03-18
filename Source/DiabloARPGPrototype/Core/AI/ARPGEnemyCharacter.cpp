@@ -20,6 +20,7 @@
 #include "Components/WidgetComponent.h"
 #include "ARPGEnemyAIController.h"
 #include "EngineUtils.h"
+#include "Kismet/GameplayStatics.h"
 
 AARPGEnemyCharacter::AARPGEnemyCharacter()
 {
@@ -58,8 +59,8 @@ AARPGEnemyCharacter::AARPGEnemyCharacter()
     SightConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightConfig"));
     DamageConfig = CreateDefaultSubobject<UAISenseConfig_Damage>(TEXT("DamageConfig"));
 
-    SightConfig->SightRadius = 800.f;
-    SightConfig->LoseSightRadius = 810.f;
+    SightConfig->SightRadius = 550.f;
+    SightConfig->LoseSightRadius = 560.f;
     SightConfig->PeripheralVisionAngleDegrees = 50.f;
     SightConfig->SetMaxAge(0.2f);
     SightConfig->DetectionByAffiliation.bDetectEnemies = true;
@@ -86,7 +87,6 @@ AARPGEnemyCharacter::AARPGEnemyCharacter()
     {
         BodyMesh->SetStaticMesh(CylinderMesh.Object);
         BodyMesh->SetRelativeScale3D(FVector(0.5f, 0.5f, 1.2f));
-        BodyMesh->SetRelativeLocation(FVector(0.f, 0.f, -45.f));
     }
 
     // Apply the hit flash material
@@ -192,21 +192,31 @@ void AARPGEnemyCharacter::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus S
     // --- PLAYER LOST (but maybe only for a moment) ---
     GetWorldTimerManager().ClearTimer(LostSightTimer);
 
-    // Mark target as lost immediately
-    CurrentTarget = nullptr;
-
     GetWorldTimerManager().SetTimer(
         LostSightTimer,
         [this]()
         {
             bPlayerReallyLost = true;
 
-            // Only clear target if still no sight
-            if (!CurrentTarget)
+            // Re-check perception before deciding the player is REALLY lost
+            AActor* Player = UGameplayStatics::GetPlayerCharacter(this, 0);
+
+            bool bStillNoSight =
+                PerceptionComponent &&
+                !PerceptionComponent->HasActiveStimulus(*Player, UAISense::GetSenseID<UAISense_Sight>());
+
+            // 🔥 NEW RULE: Only allow "really lost" if NOT in combat
+            bool bInCombat =
+                CurrentState == EEnemyState::Chase ||
+                CurrentState == EEnemyState::Attack ||
+                CurrentState == EEnemyState::Stagger;
+
+            if (bStillNoSight && !bInCombat)
             {
                 UE_LOG(LogTemp, Warning, TEXT("[AI] Player REALLY lost — returning to patrol"));
 
-                // Heal when returning to patrol
+                CurrentTarget = nullptr;
+
                 if (HealthComponent)
                 {
                     GetWorldTimerManager().SetTimer(
@@ -227,8 +237,12 @@ void AARPGEnemyCharacter::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus S
                     SetEnemyState(EEnemyState::Idle);
                 }
             }
+            else
+            {
+                UE_LOG(LogTemp, Warning, TEXT("[AI] Player sight restored OR in combat — staying in combat"));
+            }
         },
-        0.5f,   // half-second grace period
+        0.5f,
         false
     );
 }
@@ -520,7 +534,7 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
     // --- CHASE LOGIC ---
     if (CurrentState == EEnemyState::Chase)
     {
-        // --- LEASH CHECK ---
+        // --- SPAWN LEASH CHECK (existing) ---
         float DistanceFromSpawn = FVector::Dist(GetActorLocation(), SpawnLocation);
         if (DistanceFromSpawn > LeashRadius)
         {
@@ -528,13 +542,48 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
             return;
         }
 
-        // Switch to Attack if close enough
+        // --- PLAYER LEASH CHECK (NEW) ---
+        float DistanceToPlayer = FVector::Dist2D(GetActorLocation(), CurrentTarget->GetActorLocation());
+        const float PlayerLeashDistance = 600.f; // tune this
+
+        if (DistanceToPlayer > PlayerLeashDistance)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[AI] Player exceeded leash distance — returning to patrol"));
+
+            CurrentTarget = nullptr;
+
+            // Start healing if needed
+            if (HealthComponent)
+            {
+                GetWorldTimerManager().SetTimer(
+                    HealOverTimeTimer,
+                    this,
+                    &AARPGEnemyCharacter::HealOverTimeTick,
+                    0.2f,
+                    true
+                );
+            }
+
+            if (PatrolPoints.Num() > 0)
+            {
+                SetEnemyState(EEnemyState::Patrol);
+            }
+            else
+            {
+                SetEnemyState(EEnemyState::Idle);
+            }
+
+            return;
+        }
+
+        // --- SWITCH TO ATTACK ---
         if (Distance <= AttackRange)
         {
             SetEnemyState(EEnemyState::Attack);
             return;
         }
 
+        // --- MOVE TOWARD PLAYER ---
         if (AARPGEnemyAIController* AICon = GetEnemyAIController())
         {
             UE_LOG(LogTemp, Warning, TEXT("[AI] Calling MoveToActor"));
@@ -633,15 +682,15 @@ void AARPGEnemyCharacter::EnterStagger(float Duration)
 
     bIsStaggered = true;
 
-    // Stop movement immediately
-    GetCharacterMovement()->StopMovementImmediately();
+    // 🔹 Cancel any pending "player lost" logic while staggered
+    GetWorldTimerManager().ClearTimer(LostSightTimer);
+    bPlayerReallyLost = false;
 
-    // Cancel any attack wind up or behaviour when staggered
+    GetCharacterMovement()->StopMovementImmediately();
     CurrentState = EEnemyState::Stagger;
 
     GetWorldTimerManager().ClearTimer(AttackWindupTimer);
 
-    // Timer to exit stagger
     GetWorldTimerManager().SetTimer(
         StaggerTimerHandle,
         this,
@@ -655,5 +704,13 @@ void AARPGEnemyCharacter::ExitStagger()
 {
     bIsStaggered = false;
 
-    CurrentState = EEnemyState::Chase;
+    // If we still have a target after stagger, go back to chase
+    if (CurrentTarget)
+    {
+        SetEnemyState(EEnemyState::Chase);
+    }
+    else
+    {
+        CurrentState = EEnemyState::Idle;
+    }
 }

@@ -6,6 +6,9 @@
 #include "Engine/StaticMesh.h"
 #include "DiabloARPGPrototype/Core/Player/UHealthComponent.h"
 #include "DiabloARPGPrototype/Core/Player/WHealthBarWidget.h"
+#include "DiabloARPGPrototype/Core/UI/DamageNumberActor.h"
+#include "DiabloARPGPrototype/Core/AI/ARPGEnemyCharacter.h"
+#include "EngineUtils.h"
 
 AARPGPlayerCharacter::AARPGPlayerCharacter()
 {
@@ -126,8 +129,6 @@ FVector AARPGPlayerCharacter::GetMovementDirection() const
 
 void AARPGPlayerCharacter::MoveForward(float Value)
 {
-    UE_LOG(LogTemp, Warning, TEXT("[MOVE] MoveForward Value: %f"), Value);
-
     LastMoveDirection.X = Value; // always update, even when 0
 
     AddMovementInput(FVector::ForwardVector, Value);
@@ -135,8 +136,6 @@ void AARPGPlayerCharacter::MoveForward(float Value)
 
 void AARPGPlayerCharacter::MoveRight(float Value)
 {
-    UE_LOG(LogTemp, Warning, TEXT("[MOVE] MoveRight Value: %f"), Value);
-
     LastMoveDirection.Y = Value; // always update, even when 0
 
     AddMovementInput(FVector::RightVector, Value);
@@ -209,6 +208,14 @@ void AARPGPlayerCharacter::PerformTestAttack()
     // Rotate toward cursor (your existing logic)
     RotateTowardMouseCursor();
 
+    // --- DEBUG: Distance to all enemies (2D only) ---
+    for (TActorIterator<AARPGEnemyCharacter> It(GetWorld()); It; ++It)
+    {
+        float Dist2D = FVector::Dist2D(GetActorLocation(), It->GetActorLocation());
+        UE_LOG(LogTemp, Warning, TEXT("[ATTACK DEBUG] Distance to %s = %f"),
+            *It->GetName(), Dist2D);
+    }
+
     // Your existing hitbox trace
     FVector Start = GetActorLocation() + FVector(0, 0, 50.f);
     FVector Forward = GetActorForwardVector();
@@ -231,7 +238,10 @@ void AARPGPlayerCharacter::PerformTestAttack()
         Params
     );
 
-    // Debug
+    // --- DEBUG: Trace result ---
+    UE_LOG(LogTemp, Warning, TEXT("[ATTACK TRACE] bHit = %s"), bHit ? TEXT("TRUE") : TEXT("FALSE"));
+
+    // Debug visuals
     DrawDebugLine(GetWorld(), Start, End, FColor::Red, false, 1.f, 0, 2.f);
     DrawDebugSphere(GetWorld(), End, Radius, 12, FColor::Red, false, 1.f);
 
@@ -239,10 +249,26 @@ void AARPGPlayerCharacter::PerformTestAttack()
     {
         if (AActor* HitActor = Hit.GetActor())
         {
+            UE_LOG(LogTemp, Warning, TEXT("[ATTACK TRACE] Hit actor: %s"), *HitActor->GetName());
+
             if (UHealthComponent* Health = HitActor->FindComponentByClass<UHealthComponent>())
             {
                 Health->ApplyDamage(25.f, this);
                 UE_LOG(LogTemp, Warning, TEXT("Hit %s for 25 damage"), *HitActor->GetName());
+
+                // Spawn damage number at hit location
+                FVector SpawnLocation = Hit.ImpactPoint;
+
+                ADamageNumberActor* DamageActor = GetWorld()->SpawnActor<ADamageNumberActor>(
+                    ADamageNumberActor::StaticClass(),
+                    SpawnLocation,
+                    FRotator::ZeroRotator
+                );
+
+                if (DamageActor)
+                {
+                    DamageActor->Initialize(25);
+                }
 
                 if (APlayerController* PC = Cast<APlayerController>(GetController()))
                 {
@@ -250,6 +276,10 @@ void AARPGPlayerCharacter::PerformTestAttack()
                 }
             }
         }
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[ATTACK TRACE] No actor hit"));
     }
 
     // Start cooldown
