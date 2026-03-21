@@ -25,6 +25,7 @@ enum class EEnemyState : uint8
     Chase,
     Attack,
     Stagger,
+    Flee,
     Dead
 };
 

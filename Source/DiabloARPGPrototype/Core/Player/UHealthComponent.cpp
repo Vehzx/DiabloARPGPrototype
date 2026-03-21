@@ -95,7 +95,4 @@ void UHealthComponent::HandleDeath()
     bIsDead = true;
 
     OnDeath.Broadcast();
-
-    // Optional: destroy actor after delay
-    // GetOwner()->Destroy();
 }
