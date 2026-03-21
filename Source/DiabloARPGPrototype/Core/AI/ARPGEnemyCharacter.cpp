@@ -249,8 +249,13 @@ void AARPGEnemyCharacter::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus S
 
 void AARPGEnemyCharacter::SetEnemyState(EEnemyState NewState)
 {
-    if (bIsStaggered && NewState != EEnemyState::Stagger)
+    // Allow FLEE even while staggered, but block all other transitions
+    if (bIsStaggered &&
+        NewState != EEnemyState::Stagger &&
+        NewState != EEnemyState::Flee)
+    {
         return;
+    }
 
     if (CurrentState == NewState)
         return;
@@ -273,6 +278,9 @@ void AARPGEnemyCharacter::HandleStateChanged(EEnemyState OldState, EEnemyState N
     {
         UE_LOG(LogTemp, Warning, TEXT("[AI] Entered IDLE state"));
 
+        // Reset movement speed after fleeing
+        GetCharacterMovement()->MaxWalkSpeed = 300.f;
+
         if (AARPGEnemyAIController* AICon = GetEnemyAIController())
         {
             AICon->StopMovement();
@@ -285,22 +293,52 @@ void AARPGEnemyCharacter::HandleStateChanged(EEnemyState OldState, EEnemyState N
     {
         UE_LOG(LogTemp, Warning, TEXT("[AI] Entered CHASE state"));
 
+        // Stop healing when entering combat
+        GetWorldTimerManager().ClearTimer(HealOverTimeTimer);
+
+        GetCharacterMovement()->MaxWalkSpeed = 300.f;
+
         if (AARPGEnemyAIController* AICon = GetEnemyAIController())
         {
             AICon->StopMovement();
         }
 
-        // Cancel any pending patrol timer
         GetWorldTimerManager().ClearTimer(PatrolWaitTimer);
-
         break;
     }
 
     case EEnemyState::Attack:
     {
+        // Stop healing when entering combat
+        GetWorldTimerManager().ClearTimer(HealOverTimeTimer);
+
         GetWorldTimerManager().ClearTimer(PatrolWaitTimer);
         break;
     }
+
+    case EEnemyState::Flee:
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[AI] Entered FLEE state"));
+
+        if (AARPGEnemyAIController* AICon = GetEnemyAIController())
+        {
+            AICon->StopMovement();
+        }
+
+        // Increase movement speed while fleeing
+        GetCharacterMovement()->MaxWalkSpeed = 400.f;
+
+        // Rotate 180 degrees away from the player
+        if (CurrentTarget)
+        {
+            FVector Away = GetActorLocation() - CurrentTarget->GetActorLocation();
+            Away.Z = 0;
+            SetActorRotation(Away.Rotation());
+        }
+
+        break;
+    }
+
 
     case EEnemyState::Dead:
         UE_LOG(LogTemp, Warning, TEXT("[AI] Entered DEAD state"));
@@ -401,14 +439,29 @@ void AARPGEnemyCharacter::OnDamaged(AActor* DamageCauser)
     if (!DamageCauser || CurrentState == EEnemyState::Dead)
         return;
 
-    // Set target to whoever hit us
     CurrentTarget = DamageCauser;
 
-    // If not staggered, immediately chase
-    if (CurrentState != EEnemyState::Stagger)
+    // Do NOT override flee if already fleeing
+    if (CurrentState == EEnemyState::Flee)
+        return;
+
+    // Trigger flee at low health
+    if (HealthComponent &&
+        HealthComponent->GetHealth() <= HealthComponent->GetMaxHealth() * 0.25f)
     {
-        SetEnemyState(EEnemyState::Chase);
+        // ⭐ NEW: Allow flee to override stagger
+        bIsStaggered = false;
+
+        // ⭐ NEW: Also clear stagger state if currently in it
+        if (CurrentState == EEnemyState::Stagger)
+            CurrentState = EEnemyState::Idle;
+
+        SetEnemyState(EEnemyState::Flee);
+        return;
     }
+
+    // Otherwise chase normally
+    SetEnemyState(EEnemyState::Chase);
 }
 
 void AARPGEnemyCharacter::FlashOnHit()
@@ -531,10 +584,61 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
 
     float Distance = FVector::Dist(GetActorLocation(), CurrentTarget->GetActorLocation());
 
-    // --- CHASE LOGIC ---
+    // --- FLEE LOGIC ---
+    if (CurrentState == EEnemyState::Flee)
+    {
+        if (!CurrentTarget)
+        {
+            // If no target, just reset normally
+            HandleLeashReset();
+            SetEnemyState(EEnemyState::Idle);
+            return;
+        }
+
+        // Run directly away from the player
+        FVector Away = GetActorLocation() - CurrentTarget->GetActorLocation();
+        Away.Z = 0;
+        Away.Normalize();
+
+        FVector FleeDestination = GetActorLocation() + Away * 400.f;
+
+        if (AARPGEnemyAIController* AICon = GetEnemyAIController())
+        {
+            AICon->MoveToLocation(FleeDestination, 5.f);
+        }
+
+        // Once far enough, let the leash system take over
+        float DistToPlayer = FVector::Dist2D(GetActorLocation(), CurrentTarget->GetActorLocation());
+        if (DistToPlayer > 50.f)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[AI] Flee distance reached — resetting"));
+
+            // Heal, reset colour, etc.
+            HandleLeashReset();
+
+            // Clear target so chase doesn't re-trigger
+            CurrentTarget = nullptr;
+
+            // Return to patrol cleanly
+            if (PatrolPoints.Num() > 0)
+            {
+                SetEnemyState(EEnemyState::Patrol);
+            }
+            else
+            {
+                SetEnemyState(EEnemyState::Idle);
+            }
+
+            return;
+        }
+
+        return; // Do NOT continue into chase/attack logic
+    }
+
+    // CHASE LOGIC
     if (CurrentState == EEnemyState::Chase)
     {
-        // --- SPAWN LEASH CHECK (existing) ---
+        // LEASH CHECK (SPAWN POSITION)
         float DistanceFromSpawn = FVector::Dist(GetActorLocation(), SpawnLocation);
         if (DistanceFromSpawn > LeashRadius)
         {
@@ -542,9 +646,9 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
             return;
         }
 
-        // --- PLAYER LEASH CHECK (NEW) ---
+        // LEASH CHECK (DISTANCE FROM PLAYER)
         float DistanceToPlayer = FVector::Dist2D(GetActorLocation(), CurrentTarget->GetActorLocation());
-        const float PlayerLeashDistance = 600.f; // tune this
+        const float PlayerLeashDistance = 600.f;
 
         if (DistanceToPlayer > PlayerLeashDistance)
         {
@@ -576,14 +680,14 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
             return;
         }
 
-        // --- SWITCH TO ATTACK ---
+        // SWITCH TO ATTACK
         if (Distance <= AttackRange)
         {
             SetEnemyState(EEnemyState::Attack);
             return;
         }
 
-        // --- MOVE TOWARD PLAYER ---
+        // MOVE TOWARD PLAYER
         if (AARPGEnemyAIController* AICon = GetEnemyAIController())
         {
             UE_LOG(LogTemp, Warning, TEXT("[AI] Calling MoveToActor"));
@@ -608,10 +712,10 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
         }
     }
 
-    // --- ATTACK LOGIC ---
+    // ATTACK LOGIC
     if (CurrentState == EEnemyState::Attack)
     {
-        // --- LEASH CHECK ---
+        // LEASH CHECK
         float DistanceFromSpawn = FVector::Dist(GetActorLocation(), SpawnLocation);
         if (DistanceFromSpawn > LeashRadius)
         {
@@ -644,7 +748,7 @@ void AARPGEnemyCharacter::HealOverTimeTick()
 {
     if (!HealthComponent) return;
 
-    // Heal amount per tick (tweak as needed)
+    // Heal amount per tick
     HealthComponent->Heal(5.f);
 
     // Stop healing when full
@@ -656,14 +760,14 @@ void AARPGEnemyCharacter::HealOverTimeTick()
 
 void AARPGEnemyCharacter::HandleLeashReset()
 {
-    // Heal to full
+    // Heal to full when leash range triggers
     if (HealthComponent)
     {
         GetWorldTimerManager().SetTimer(
             HealOverTimeTimer,
             this,
             &AARPGEnemyCharacter::HealOverTimeTick,
-            0.2f,   // tick rate
+            0.2f,
             true    // looping
         );
     }
@@ -671,7 +775,7 @@ void AARPGEnemyCharacter::HandleLeashReset()
     // Clear any attack windup
     GetWorldTimerManager().ClearTimer(AttackWindupTimer);
 
-    // Optional: reset colour
+    // Reset mesh colour
     BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
 }
 
@@ -682,7 +786,7 @@ void AARPGEnemyCharacter::EnterStagger(float Duration)
 
     bIsStaggered = true;
 
-    // 🔹 Cancel any pending "player lost" logic while staggered
+    // Cancel any pending player lost logic while staggered
     GetWorldTimerManager().ClearTimer(LostSightTimer);
     bPlayerReallyLost = false;
 
