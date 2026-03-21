@@ -253,8 +253,8 @@ void AARPGPlayerCharacter::PerformTestAttack()
 
             if (UHealthComponent* Health = HitActor->FindComponentByClass<UHealthComponent>())
             {
-                Health->ApplyDamage(10.f, this);
-                UE_LOG(LogTemp, Warning, TEXT("Hit %s for 10 damage"), *HitActor->GetName());
+                Health->ApplyDamage(25.f, this);
+                UE_LOG(LogTemp, Warning, TEXT("Hit %s for 25 damage"), *HitActor->GetName());
 
                 // Spawn damage number at hit location
                 FVector SpawnLocation = Hit.ImpactPoint;
