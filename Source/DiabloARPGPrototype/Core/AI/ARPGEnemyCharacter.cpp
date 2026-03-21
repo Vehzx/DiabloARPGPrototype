@@ -170,6 +170,10 @@ void AARPGEnemyCharacter::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus S
     // --- PLAYER DETECTED ---
     if (Stimulus.WasSuccessfullySensed())
     {
+
+        if (CurrentState == EEnemyState::Flee)
+            return;
+
         // Cancel ANY pending "lost sight" logic
         GetWorldTimerManager().ClearTimer(LostSightTimer);
         bPlayerReallyLost = false;
@@ -196,6 +200,9 @@ void AARPGEnemyCharacter::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus S
         LostSightTimer,
         [this]()
         {
+            if (CurrentState == EEnemyState::Flee)
+                return;
+
             bPlayerReallyLost = true;
 
             // Re-check perception before deciding the player is REALLY lost
@@ -209,7 +216,8 @@ void AARPGEnemyCharacter::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus S
             bool bInCombat =
                 CurrentState == EEnemyState::Chase ||
                 CurrentState == EEnemyState::Attack ||
-                CurrentState == EEnemyState::Stagger;
+                CurrentState == EEnemyState::Stagger ||
+                CurrentState == EEnemyState::Flee;
 
             if (bStillNoSight && !bInCombat)
             {
@@ -326,7 +334,7 @@ void AARPGEnemyCharacter::HandleStateChanged(EEnemyState OldState, EEnemyState N
         }
 
         // Increase movement speed while fleeing
-        GetCharacterMovement()->MaxWalkSpeed = 400.f;
+        GetCharacterMovement()->MaxWalkSpeed = 600.f;
 
         // Rotate 180 degrees away from the player
         if (CurrentTarget)
@@ -460,8 +468,12 @@ void AARPGEnemyCharacter::OnDamaged(AActor* DamageCauser)
         return;
     }
 
-    // Otherwise chase normally
-    SetEnemyState(EEnemyState::Chase);
+    // Otherwise chase normally — but NOT if fleeing
+    if (CurrentState != EEnemyState::Flee)
+    {
+        SetEnemyState(EEnemyState::Chase);
+    }
+
 }
 
 void AARPGEnemyCharacter::FlashOnHit()
@@ -609,7 +621,7 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
 
         // Once far enough, let the leash system take over
         float DistToPlayer = FVector::Dist2D(GetActorLocation(), CurrentTarget->GetActorLocation());
-        if (DistToPlayer > 50.f)
+        if (DistToPlayer > 500.f)
         {
             UE_LOG(LogTemp, Warning, TEXT("[AI] Flee distance reached — resetting"));
 
@@ -792,7 +804,7 @@ void AARPGEnemyCharacter::EnterStagger(float Duration)
 
     GetCharacterMovement()->StopMovementImmediately();
     CurrentState = EEnemyState::Stagger;
-
+     
     GetWorldTimerManager().ClearTimer(AttackWindupTimer);
 
     GetWorldTimerManager().SetTimer(
@@ -808,7 +820,10 @@ void AARPGEnemyCharacter::ExitStagger()
 {
     bIsStaggered = false;
 
-    // If we still have a target after stagger, go back to chase
+    // Do NOT override flee when stagger ends
+    if (CurrentState == EEnemyState::Flee)
+        return;
+
     if (CurrentTarget)
     {
         SetEnemyState(EEnemyState::Chase);
