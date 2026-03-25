@@ -27,6 +27,7 @@ enum class EEnemyState : uint8
     Chase,
     Attack,
     Stagger,
+    Panic,
     Flee,
     Dead
 };
@@ -131,6 +132,12 @@ private:
     float PatrolWaitTime = 2.0f;
 
     FTimerHandle PatrolWaitTimer;
+
+    FTimerHandle PanicTimerHandle;
+
+    // Flee direction locking
+    FVector LockedFleeDirection = FVector::ZeroVector;
+    float FleeDirectionLockTime = 0.f;
 
     void AdvancePatrol();
 
