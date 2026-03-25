@@ -258,7 +258,7 @@ void AARPGEnemyCharacter::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus S
                 PerceptionComponent &&
                 !PerceptionComponent->HasActiveStimulus(*Player, UAISense::GetSenseID<UAISense_Sight>());
 
-            // 🔥 NEW RULE: Only allow "really lost" if NOT in combat
+            // Only allow "really lost" if NOT in combat
             bool bInCombat =
                 CurrentState == EEnemyState::Chase ||
                 CurrentState == EEnemyState::Attack ||
@@ -293,7 +293,8 @@ void AARPGEnemyCharacter::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus S
             }
             else
             {
-                UE_LOG(LogTemp, Warning, TEXT("[AI] Player sight restored OR in combat — staying in combat"));
+                if (bInCombat)
+                    return;
             }
         },
         0.5f,
@@ -350,11 +351,17 @@ void AARPGEnemyCharacter::HandleStateChanged(EEnemyState OldState, EEnemyState N
         // Stop healing when entering combat
         GetWorldTimerManager().ClearTimer(HealOverTimeTimer);
 
-        GetCharacterMovement()->MaxWalkSpeed = 300.f;
+        GetCharacterMovement()->MaxWalkSpeed = 400.f;
 
         if (AARPGEnemyAIController* AICon = GetEnemyAIController())
         {
             AICon->StopMovement();
+
+        // Immediately restart chase movement
+        if (CurrentTarget)
+        {
+            AICon->MoveToActor(CurrentTarget, 5.f);
+        }
         }
 
         GetWorldTimerManager().ClearTimer(PatrolWaitTimer);
@@ -370,6 +377,44 @@ void AARPGEnemyCharacter::HandleStateChanged(EEnemyState OldState, EEnemyState N
         break;
     }
 
+    case EEnemyState::Panic:
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[AI] Entered PANIC state"));
+
+        // Show low health icon
+        if (LowHealthIcon)
+            LowHealthIcon->SetHiddenInGame(false);
+
+        // Rotate away from the player immediately
+        if (CurrentTarget)
+        {
+            FVector Away = GetActorLocation() - CurrentTarget->GetActorLocation();
+            Away.Z = 0;
+            SetActorRotation(Away.Rotation());
+        }
+
+        // Stop movement during panic
+        if (AARPGEnemyAIController* AICon = GetEnemyAIController())
+            AICon->StopMovement();
+
+        // Change colour to yellow/orange
+        if (BodyMesh)
+            BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(1.f, 0.7f, 0.f));
+
+        // After a short delay, actually flee
+        GetWorldTimerManager().SetTimer(
+            PanicTimerHandle,
+            [this]()
+            {
+                SetEnemyState(EEnemyState::Flee);
+            },
+            0.4f, // reaction window
+            false
+        );
+
+        break;
+    }
+
     case EEnemyState::Flee:
     {
         UE_LOG(LogTemp, Warning, TEXT("[AI] Entered FLEE state"));
@@ -381,14 +426,6 @@ void AARPGEnemyCharacter::HandleStateChanged(EEnemyState OldState, EEnemyState N
 
         // Increase movement speed while fleeing
         GetCharacterMovement()->MaxWalkSpeed = 600.f;
-
-        // Rotate 180 degrees away from the player
-        if (CurrentTarget)
-        {
-            FVector Away = GetActorLocation() - CurrentTarget->GetActorLocation();
-            Away.Z = 0;
-            SetActorRotation(Away.Rotation());
-        }
 
         break;
     }
@@ -495,13 +532,23 @@ void AARPGEnemyCharacter::OnDamaged(AActor* DamageCauser)
 
     CurrentTarget = DamageCauser;
 
-    // Do NOT override flee if already fleeing
+    // If already fleeing, ignore damage entirely
     if (CurrentState == EEnemyState::Flee)
         return;
 
-    // Trigger flee at low health
-    if (HealthComponent &&
-        HealthComponent->GetHealth() <= HealthComponent->GetMaxHealth() * 0.25f)
+    // If hit during PANIC → flee immediately
+    if (CurrentState == EEnemyState::Panic)
+    {
+        // Cancel the pending panic timer
+        GetWorldTimerManager().ClearTimer(PanicTimerHandle);
+
+        // Go straight to flee
+        SetEnemyState(EEnemyState::Flee);
+        return;
+    }
+
+    // Trigger PANIC at low health (only if last stand not used)
+    if (HealthComponent && HealthComponent->GetHealth() <= HealthComponent->GetMaxHealth() * 0.25f)
     {
         // Show low health icon
         if (LowHealthIcon)
@@ -509,22 +556,19 @@ void AARPGEnemyCharacter::OnDamaged(AActor* DamageCauser)
             LowHealthIcon->SetHiddenInGame(false);
         }
 
-        // Allow flee to override stagger
+        // Allow panic/flee to override stagger
         bIsStaggered = false;
 
-        // Also clear stagger state if currently in it
         if (CurrentState == EEnemyState::Stagger)
             CurrentState = EEnemyState::Idle;
 
-        SetEnemyState(EEnemyState::Flee);
+        // Enter panic state
+        SetEnemyState(EEnemyState::Panic);
         return;
     }
 
-    // Otherwise chase normally but NOT if fleeing
-    if (CurrentState != EEnemyState::Flee)
-    {
-        SetEnemyState(EEnemyState::Chase);
-    }
+    // Otherwise chase normally
+    SetEnemyState(EEnemyState::Chase);
 }
 
 void AARPGEnemyCharacter::ShowHoverDecal()
@@ -664,50 +708,110 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
     {
         if (!CurrentTarget)
         {
-            // If no target, just reset normally
             HandleLeashReset();
             SetEnemyState(EEnemyState::Idle);
             return;
         }
 
-        // Run directly away from the player
-        FVector Away = GetActorLocation() - CurrentTarget->GetActorLocation();
-        Away.Z = 0;
-        Away.Normalize();
+        FVector MyLocation = GetActorLocation();
+        FVector PlayerLocation = CurrentTarget->GetActorLocation();
 
-        FVector FleeDestination = GetActorLocation() + Away * 400.f;
+        // --- DIRECTION LOCKING ---
+        if (FleeDirectionLockTime > 0.f)
+        {
+            FleeDirectionLockTime -= DeltaTime;
+
+            FVector FleeDestination = MyLocation + LockedFleeDirection * 400.f;
+
+            if (AARPGEnemyAIController* AICon = GetEnemyAIController())
+            {
+                AICon->MoveToLocation(FleeDestination, 5.f);
+            }
+
+            float DistToPlayer = FVector::Dist2D(MyLocation, PlayerLocation);
+            if (DistToPlayer > 500.f)
+            {
+                HandleLeashReset();
+                CurrentTarget = nullptr;
+
+                if (PatrolPoints.Num() > 0)
+                    SetEnemyState(EEnemyState::Patrol);
+                else
+                    SetEnemyState(EEnemyState::Idle);
+
+                return;
+            }
+
+            return;
+        }
+
+        // --- NORMAL FLEE LOGIC ---
+        FVector BaseAway = MyLocation - PlayerLocation;
+        BaseAway.Z = 0;
+        BaseAway.Normalize();
+
+        // Try angles: 0°, 30°, -30°, 60°, -60°, 90°, -90°, 120°, -120°
+        const float Angles[] = {
+            0.f, 30.f, -30.f, 60.f, -60.f, 90.f, -90.f, 120.f, -120.f
+        };
+
+        FVector BestDirection = BaseAway;
+        bool bFoundDirection = false;
+
+        for (float Angle : Angles)
+        {
+            FRotator Rot(0.f, Angle, 0.f);
+            FVector TestDir = Rot.RotateVector(BaseAway);
+
+            FVector TestPoint = MyLocation + TestDir * 400.f;
+
+            FNavLocation OutLoc;
+            if (NavSys && NavSys->ProjectPointToNavigation(TestPoint, OutLoc))
+            {
+                BestDirection = TestDir;
+                bFoundDirection = true;
+
+                // LOCK THIS DIRECTION FOR STABILITY
+                LockedFleeDirection = BestDirection;
+                FleeDirectionLockTime = 0.25f; // quarter second lock
+
+                break;
+            }
+        }
+
+        // If no direction found, just stop fleeing and let leash reset handle it
+        if (!bFoundDirection)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("[AI] No flee direction found — holding position"));
+            return;
+        }
+
+        // Move using the best direction found
+        FVector FleeDestination = MyLocation + BestDirection * 400.f;
 
         if (AARPGEnemyAIController* AICon = GetEnemyAIController())
         {
             AICon->MoveToLocation(FleeDestination, 5.f);
         }
 
-        // Once far enough, let the leash system take over
-        float DistToPlayer = FVector::Dist2D(GetActorLocation(), CurrentTarget->GetActorLocation());
+        // Flee distance reset
+        float DistToPlayer = FVector::Dist2D(MyLocation, PlayerLocation);
         if (DistToPlayer > 500.f)
         {
             UE_LOG(LogTemp, Warning, TEXT("[AI] Flee distance reached — resetting"));
 
-            // Heal, reset colour, etc.
             HandleLeashReset();
-
-            // Clear target so chase doesn't re-trigger
             CurrentTarget = nullptr;
 
-            // Return to patrol cleanly
             if (PatrolPoints.Num() > 0)
-            {
                 SetEnemyState(EEnemyState::Patrol);
-            }
             else
-            {
                 SetEnemyState(EEnemyState::Idle);
-            }
 
             return;
         }
 
-        return; // Do NOT continue into chase/attack logic
+        return;
     }
 
     // CHASE LOGIC
