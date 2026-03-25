@@ -53,6 +53,29 @@ AARPGEnemyCharacter::AARPGEnemyCharacter()
         HealthBarWidgetComponent->SetWidgetClass(HealthBarClass.Class);
     }
 
+    // Enemy Hover Decal
+    HoverDecal = CreateDefaultSubobject<UDecalComponent>(TEXT("HoverDecal"));
+    HoverDecal->SetupAttachment(RootComponent);
+
+    // Size of the decal
+    HoverDecal->DecalSize = FVector(64.f, 128.f, 128.f);
+
+    // Rotate so it projects downward
+    HoverDecal->SetRelativeLocation(FVector(0.f, 0.f, -150.f));
+    HoverDecal->SetRelativeRotation(FRotator(-90.f, 0.f, 0.f));
+
+    // Start hidden
+    HoverDecal->SetVisibility(false);
+
+    static ConstructorHelpers::FObjectFinder<UMaterialInterface> HoverMat(
+        TEXT("/Game/Materials/M_HoverRing.M_HoverRing")
+    );
+
+    if (HoverMat.Succeeded())
+    {
+        HoverDecal->SetDecalMaterial(HoverMat.Object);
+    }
+
     // AI Perception Component
     PerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("PerceptionComponent"));
 
@@ -78,6 +101,10 @@ AARPGEnemyCharacter::AARPGEnemyCharacter()
     // Visual Mesh Setup
     BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh"));
     BodyMesh->SetupAttachment(GetCapsuleComponent());
+
+    // Prevent decals from projecting onto the mesh
+    BodyMesh->SetReceivesDecals(false);
+
 
     static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(
         TEXT("/Engine/BasicShapes/Cylinder.Cylinder")
@@ -457,10 +484,10 @@ void AARPGEnemyCharacter::OnDamaged(AActor* DamageCauser)
     if (HealthComponent &&
         HealthComponent->GetHealth() <= HealthComponent->GetMaxHealth() * 0.25f)
     {
-        // ⭐ NEW: Allow flee to override stagger
+        // Allow flee to override stagger
         bIsStaggered = false;
 
-        // ⭐ NEW: Also clear stagger state if currently in it
+        // Also clear stagger state if currently in it
         if (CurrentState == EEnemyState::Stagger)
             CurrentState = EEnemyState::Idle;
 
@@ -474,6 +501,18 @@ void AARPGEnemyCharacter::OnDamaged(AActor* DamageCauser)
         SetEnemyState(EEnemyState::Chase);
     }
 
+}
+
+void AARPGEnemyCharacter::ShowHoverDecal()
+{
+    if (HoverDecal)
+        HoverDecal->SetVisibility(true);
+}
+
+void AARPGEnemyCharacter::HideHoverDecal()
+{
+    if (HoverDecal)
+        HoverDecal->SetVisibility(false);
 }
 
 void AARPGEnemyCharacter::FlashOnHit()

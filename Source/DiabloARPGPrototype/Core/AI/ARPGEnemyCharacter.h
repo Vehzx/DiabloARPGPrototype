@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Perception/AIPerceptionTypes.h"
+#include "Components/DecalComponent.h"
 #include "ARPGEnemyCharacter.generated.h"
 
 // Forward declarations
@@ -54,6 +55,12 @@ public:
     float AttackCooldown = 1.0f;
 
     float TimeSinceLastAttack = 0.f;
+
+    UPROPERTY(VisibleAnywhere, Category = "Hover")
+    UDecalComponent* HoverDecal;
+
+    void ShowHoverDecal();
+    void HideHoverDecal();
 
 protected:
     virtual void BeginPlay() override;
