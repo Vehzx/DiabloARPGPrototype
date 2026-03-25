@@ -105,6 +105,25 @@ AARPGEnemyCharacter::AARPGEnemyCharacter()
     // Prevent decals from projecting onto the mesh
     BodyMesh->SetReceivesDecals(false);
 
+    // Low Health Icon
+    LowHealthIcon = CreateDefaultSubobject<UBillboardComponent>(TEXT("LowHealthIcon"));
+    LowHealthIcon->SetupAttachment(RootComponent);
+
+    // Position above the head
+    LowHealthIcon->SetRelativeLocation(FVector(0.f, 0.f, 180.f));
+
+    // Start hidden
+    LowHealthIcon->SetHiddenInGame(true);
+
+    // Assign texture
+    static ConstructorHelpers::FObjectFinder<UTexture2D> LowHealthTex(
+        TEXT("/Game/Textures/lowhealthicon.lowhealthicon")
+    );
+
+    if (LowHealthTex.Succeeded())
+    {
+        LowHealthIcon->SetSprite(LowHealthTex.Object);
+    }
 
     static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(
         TEXT("/Engine/BasicShapes/Cylinder.Cylinder")
@@ -484,6 +503,12 @@ void AARPGEnemyCharacter::OnDamaged(AActor* DamageCauser)
     if (HealthComponent &&
         HealthComponent->GetHealth() <= HealthComponent->GetMaxHealth() * 0.25f)
     {
+        // Show low health icon
+        if (LowHealthIcon)
+        {
+            LowHealthIcon->SetHiddenInGame(false);
+        }
+
         // Allow flee to override stagger
         bIsStaggered = false;
 
@@ -495,12 +520,11 @@ void AARPGEnemyCharacter::OnDamaged(AActor* DamageCauser)
         return;
     }
 
-    // Otherwise chase normally — but NOT if fleeing
+    // Otherwise chase normally but NOT if fleeing
     if (CurrentState != EEnemyState::Flee)
     {
         SetEnemyState(EEnemyState::Chase);
     }
-
 }
 
 void AARPGEnemyCharacter::ShowHoverDecal()
@@ -828,6 +852,10 @@ void AARPGEnemyCharacter::HandleLeashReset()
 
     // Reset mesh colour
     BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
+
+    // Hide low health icon once enemy finishes fleeing
+    if (LowHealthIcon)
+        LowHealthIcon->SetHiddenInGame(true);
 }
 
 void AARPGEnemyCharacter::EnterStagger(float Duration)
