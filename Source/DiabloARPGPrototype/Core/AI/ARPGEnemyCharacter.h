@@ -4,6 +4,7 @@
 #include "GameFramework/Character.h"
 #include "Perception/AIPerceptionTypes.h"
 #include "Components/DecalComponent.h"
+#include "Components/BillboardComponent.h"
 #include "ARPGEnemyCharacter.generated.h"
 
 // Forward declarations
@@ -85,6 +86,9 @@ private:
 
     UPROPERTY(VisibleAnywhere, Category = "Components")
     UWidgetComponent* HealthBarWidgetComponent;
+
+    UPROPERTY(VisibleAnywhere, Category = "Components")
+    UBillboardComponent* LowHealthIcon;
 
     UFUNCTION()
     void HandleDeath();
