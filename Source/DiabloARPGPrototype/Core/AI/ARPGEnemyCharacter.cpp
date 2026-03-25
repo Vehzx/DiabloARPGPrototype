@@ -357,11 +357,11 @@ void AARPGEnemyCharacter::HandleStateChanged(EEnemyState OldState, EEnemyState N
         {
             AICon->StopMovement();
 
-        // Immediately restart chase movement
-        if (CurrentTarget)
-        {
-            AICon->MoveToActor(CurrentTarget, 5.f);
-        }
+            // Immediately restart chase movement
+            if (CurrentTarget)
+            {
+                AICon->MoveToActor(CurrentTarget, 5.f);
+            }
         }
 
         GetWorldTimerManager().ClearTimer(PatrolWaitTimer);
@@ -866,28 +866,38 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
             return;
         }
 
-        // MOVE TOWARD PLAYER
-        if (AARPGEnemyAIController* AICon = GetEnemyAIController())
+        // MOVE TOWARD PLAYER ONLY IF OUTSIDE ATTACK RANGE
+        if (Distance > AttackRange)
         {
-            UE_LOG(LogTemp, Warning, TEXT("[AI] Calling MoveToActor"));
-
-            EPathFollowingRequestResult::Type Result =
-                AICon->MoveToActor(CurrentTarget, 5.f);
-
-            switch (Result)
+            if (AARPGEnemyAIController* AICon = GetEnemyAIController())
             {
-            case EPathFollowingRequestResult::Failed:
-                UE_LOG(LogTemp, Error, TEXT("[AI] MoveToActor FAILED"));
-                break;
+                UE_LOG(LogTemp, Warning, TEXT("[AI] Calling MoveToActor"));
 
-            case EPathFollowingRequestResult::AlreadyAtGoal:
-                UE_LOG(LogTemp, Warning, TEXT("[AI] MoveToActor: Already at goal"));
-                break;
+                EPathFollowingRequestResult::Type Result =
+                    AICon->MoveToActor(CurrentTarget, 5.f);
 
-            case EPathFollowingRequestResult::RequestSuccessful:
-                UE_LOG(LogTemp, Warning, TEXT("[AI] MoveToActor: Request Successful"));
-                break;
+                switch (Result)
+                {
+                case EPathFollowingRequestResult::Failed:
+                    UE_LOG(LogTemp, Error, TEXT("[AI] MoveToActor FAILED"));
+                    break;
+
+                case EPathFollowingRequestResult::AlreadyAtGoal:
+                    UE_LOG(LogTemp, Warning, TEXT("[AI] MoveToActor: Already at goal"));
+                    break;
+
+                case EPathFollowingRequestResult::RequestSuccessful:
+                    UE_LOG(LogTemp, Warning, TEXT("[AI] MoveToActor: Request Successful"));
+                    break;
+                }
             }
+        }
+        else
+        {
+            // Inside attack range → rotate toward player
+            FVector Dir = CurrentTarget->GetActorLocation() - GetActorLocation();
+            Dir.Z = 0;
+            SetActorRotation(Dir.Rotation());
         }
     }
 
@@ -906,8 +916,15 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
         if (Distance > AttackRange)
         {
             SetEnemyState(EEnemyState::Chase);
+
+            if (AARPGEnemyAIController* AICon = GetEnemyAIController())
+            {
+                AICon->MoveToActor(CurrentTarget, 5.f);
+            }
+
             return;
         }
+
 
         // Face the player
         FVector Dir = CurrentTarget->GetActorLocation() - GetActorLocation();
@@ -975,7 +992,7 @@ void AARPGEnemyCharacter::EnterStagger(float Duration)
 
     GetCharacterMovement()->StopMovementImmediately();
     CurrentState = EEnemyState::Stagger;
-     
+
     GetWorldTimerManager().ClearTimer(AttackWindupTimer);
 
     GetWorldTimerManager().SetTimer(
@@ -998,6 +1015,11 @@ void AARPGEnemyCharacter::ExitStagger()
     if (CurrentTarget)
     {
         SetEnemyState(EEnemyState::Chase);
+
+        if (AARPGEnemyAIController* AICon = GetEnemyAIController())
+        {
+            AICon->MoveToActor(CurrentTarget, 5.f);
+        }
     }
     else
     {
