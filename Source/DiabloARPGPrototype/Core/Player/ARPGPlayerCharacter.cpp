@@ -362,16 +362,48 @@ void AARPGPlayerCharacter::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
 
+    // --- DEATH SHRINK ---
     if (bIsDying)
     {
         FVector NewScale = GetActorScale3D() - FVector(DeathShrinkSpeed * DeltaTime);
 
-        // Clamp to zero so it never goes negative
         NewScale.X = FMath::Max(NewScale.X, 0.0f);
         NewScale.Y = FMath::Max(NewScale.Y, 0.0f);
         NewScale.Z = FMath::Max(NewScale.Z, 0.0f);
 
         SetActorScale3D(NewScale);
+        return; // No need to process hover logic while dying
+    }
+
+    // --- CURSOR HOVER ENEMY DETECTION ---
+    APlayerController* PC = Cast<APlayerController>(GetController());
+    if (!PC)
+        return;
+
+    FHitResult Hit;
+    PC->GetHitResultUnderCursor(ECC_Visibility, false, Hit);
+
+    // Track which enemy was hovered last frame
+    static AARPGEnemyCharacter* LastHoveredEnemy = nullptr;
+
+    // Check if we are hovering an enemy
+    AARPGEnemyCharacter* HoveredEnemy = Cast<AARPGEnemyCharacter>(Hit.GetActor());
+
+    // If we hovered a NEW enemy, hide the old one
+    if (LastHoveredEnemy && LastHoveredEnemy != HoveredEnemy)
+    {
+        LastHoveredEnemy->HideHoverDecal();
+    }
+
+    // If we are hovering an enemy, show its decal
+    if (HoveredEnemy)
+    {
+        HoveredEnemy->ShowHoverDecal();
+        LastHoveredEnemy = HoveredEnemy;
+    }
+    else
+    {
+        LastHoveredEnemy = nullptr;
     }
 }
 
