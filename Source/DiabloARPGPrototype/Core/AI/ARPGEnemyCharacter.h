@@ -139,6 +139,8 @@ private:
     FVector LockedFleeDirection = FVector::ZeroVector;
     float FleeDirectionLockTime = 0.f;
 
+    FVector FleeStartLocation = FVector::ZeroVector;
+
     void AdvancePatrol();
 
     // Combat
