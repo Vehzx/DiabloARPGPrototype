@@ -53,6 +53,14 @@ public:
 
     void OnDamaged(AActor* DamageCauser);
 
+    UPROPERTY(VisibleAnywhere, Category = "AI")
+    EEnemyState CurrentState = EEnemyState::Idle;
+
+    UPROPERTY(EditAnywhere, Category = "Combat")
+    float AttackRange = 120.f;
+
+    UPROPERTY()
+    AActor* CurrentTarget = nullptr;
 
     float AttackCooldown = 1.0f;
 
@@ -61,11 +69,23 @@ public:
     UPROPERTY(VisibleAnywhere, Category = "Hover")
     UDecalComponent* HoverDecal;
 
+    AARPGEnemyAIController* GetEnemyAIController() const;
+
+    UPROPERTY(VisibleAnywhere, Category = "Components")
+    UBillboardComponent* LowHealthIcon;
+
+    virtual bool CanEnterFlee() const { return true; }
+
     void ShowHoverDecal();
     void HideHoverDecal();
 
 protected:
     virtual void BeginPlay() override;
+
+    // Override in subclasses that handle their own chase movement
+    virtual bool OverridesChaseMovement() const { return false; }
+
+    bool bIsMovingToTarget = false;
 
     // LEASHING SYSTEM
     FVector SpawnLocation;
@@ -75,6 +95,9 @@ protected:
 
     FTimerHandle LostSightTimer;
     bool bPlayerReallyLost = false;
+
+    float TimeInChaseWithoutPath = 0.f;
+
 
 private:
 
@@ -87,9 +110,6 @@ private:
 
     UPROPERTY(VisibleAnywhere, Category = "Components")
     UWidgetComponent* HealthBarWidgetComponent;
-
-    UPROPERTY(VisibleAnywhere, Category = "Components")
-    UBillboardComponent* LowHealthIcon;
 
     UFUNCTION()
     void HandleDeath();
@@ -110,14 +130,7 @@ private:
     UFUNCTION()
     void OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
 
-    AARPGEnemyAIController* GetEnemyAIController() const;
-
     // Enemy State Machine
-    UPROPERTY(VisibleAnywhere, Category = "AI")
-    EEnemyState CurrentState = EEnemyState::Idle;
-
-    UPROPERTY()
-    AActor* CurrentTarget = nullptr;
 
     void SetEnemyState(EEnemyState NewState);
     void HandleStateChanged(EEnemyState OldState, EEnemyState NewState);
@@ -144,8 +157,6 @@ private:
     void AdvancePatrol();
 
     // Combat
-    UPROPERTY(EditAnywhere, Category = "Combat")
-    float AttackRange = 120.f;
 
     UPROPERTY(EditAnywhere, Category = "Combat")
     float AttackDamage = 10.f;

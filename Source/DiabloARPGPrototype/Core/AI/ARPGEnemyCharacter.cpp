@@ -329,6 +329,16 @@ void AARPGEnemyCharacter::SetEnemyState(EEnemyState NewState)
 
 void AARPGEnemyCharacter::HandleStateChanged(EEnemyState OldState, EEnemyState NewState)
 {
+    // Cancel attack windup whenever state changes
+    GetWorldTimerManager().ClearTimer(AttackWindupTimer);
+
+    // Hide low health icon
+    if (OldState == EEnemyState::Panic || OldState == EEnemyState::Flee)
+    {
+        if (LowHealthIcon)
+            LowHealthIcon->SetHiddenInGame(true);
+    }
+
     switch (NewState)
     {
     case EEnemyState::Idle:
@@ -350,19 +360,19 @@ void AARPGEnemyCharacter::HandleStateChanged(EEnemyState OldState, EEnemyState N
     {
         UE_LOG(LogTemp, Warning, TEXT("[AI] Entered CHASE state"));
 
-        // Stop healing when entering combat
-        GetWorldTimerManager().ClearTimer(HealOverTimeTimer);
+        bIsMovingToTarget = false;
 
+        GetWorldTimerManager().ClearTimer(HealOverTimeTimer);
         GetCharacterMovement()->MaxWalkSpeed = 400.f;
 
         if (AARPGEnemyAIController* AICon = GetEnemyAIController())
         {
             AICon->StopMovement();
 
-            // Immediately restart chase movement
             if (CurrentTarget)
             {
-                AICon->MoveToActor(CurrentTarget, 5.f);
+                EPathFollowingRequestResult::Type Result = AICon->MoveToActor(CurrentTarget, 5.f);
+                bIsMovingToTarget = (Result == EPathFollowingRequestResult::RequestSuccessful);
             }
         }
 
@@ -403,12 +413,20 @@ void AARPGEnemyCharacter::HandleStateChanged(EEnemyState OldState, EEnemyState N
         if (BodyMesh)
             BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(1.f, 0.7f, 0.f));
 
-        // After a short delay, actually flee
+        // After a short delay, either flee OR (for ranged) go back to chase
         GetWorldTimerManager().SetTimer(
             PanicTimerHandle,
             [this]()
             {
-                SetEnemyState(EEnemyState::Flee);
+                if (CanEnterFlee())
+                {
+                    SetEnemyState(EEnemyState::Flee);
+                }
+                else
+                {
+                    // Ranged enemies skip flee entirely
+                    SetEnemyState(EEnemyState::Chase);
+                }
             },
             0.4f, // reaction window
             false
@@ -564,7 +582,8 @@ void AARPGEnemyCharacter::OnDamaged(AActor* DamageCauser)
     }
 
     // Trigger PANIC at low health
-    if (HealthComponent && HealthComponent->GetHealth() <= HealthComponent->GetMaxHealth() * 0.25f)
+    if (HealthComponent &&
+        HealthComponent->GetHealth() <= HealthComponent->GetMaxHealth() * 0.25f && CanEnterFlee())
     {
         // Show low health icon
         if (LowHealthIcon)
@@ -622,6 +641,8 @@ void AARPGEnemyCharacter::ApplyKnockback(const FVector& Direction, float Strengt
 
 void AARPGEnemyCharacter::StartAttackWindup()
 {
+    GetWorldTimerManager().ClearTimer(AttackWindupTimer); // Also clear windup timer here as a safety net
+
     UE_LOG(LogTemp, Warning, TEXT("[AI] StartAttackWindup() CALLED � setting ORANGE"));
 
     if (BodyMesh)
@@ -641,16 +662,19 @@ void AARPGEnemyCharacter::StartAttackWindup()
 
 void AARPGEnemyCharacter::FinishWindupAndAttack()
 {
-    UE_LOG(LogTemp, Warning, TEXT("[AI] FinishWindupAndAttack() CALLED � resetting to GREY"));
+    UE_LOG(LogTemp, Warning, TEXT("[AI] FinishWindupAndAttack() CALLED – resetting to GREY"));
 
     if (BodyMesh)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[AI] Setting BaseColour = GREY"));
         BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
     }
 
     PerformAttack();
+
+    // Only leave attack state after the attack windup ends
+    SetEnemyState(EEnemyState::Chase);
 }
+
 
 void AARPGEnemyCharacter::Tick(float DeltaTime)
 {
@@ -862,12 +886,44 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
     // CHASE LOGIC
     if (CurrentState == EEnemyState::Chase)
     {
-        // LEASH CHECK (SPAWN POSITION)
-        float DistanceFromSpawn = FVector::Dist(GetActorLocation(), SpawnLocation);
-        if (DistanceFromSpawn > LeashRadius)
+        // Allow subclasses to fully override chase movement + rotation
+        if (OverridesChaseMovement())
         {
-            HandleLeashReset();
             return;
+        }
+
+        // --- CHASE WATCHDOG (MELEE ONLY) ---
+        {
+            AARPGEnemyAIController* AICon = GetEnemyAIController();
+            bool bHasPath =
+                AICon &&
+                AICon->GetPathFollowingComponent() &&
+                AICon->GetPathFollowingComponent()->GetStatus() == EPathFollowingStatus::Moving;
+
+            if (!bHasPath)
+            {
+                TimeInChaseWithoutPath += DeltaTime;
+            }
+            else
+            {
+                TimeInChaseWithoutPath = 0.f;
+            }
+
+            // If we've been in CHASE for a while with no active path, re-issue MoveToActor
+            if (TimeInChaseWithoutPath > 0.5f && CurrentTarget)
+            {
+                UE_LOG(LogTemp, Warning, TEXT("[CHASE WATCHDOG] Re-issuing MoveToActor for %s"),
+                    *GetNameSafe(CurrentTarget));
+
+                TimeInChaseWithoutPath = 0.f;
+
+                if (AICon)
+                {
+                    bIsMovingToTarget = false; // force fresh request
+                    AICon->StopMovement();
+                    AICon->MoveToActor(CurrentTarget, 5.f);
+                }
+            }
         }
 
         // LEASH CHECK (DISTANCE FROM PLAYER)
@@ -877,7 +933,7 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
         if (DistanceToPlayer > PlayerLeashDistance)
         {
             UE_LOG(LogTemp, Warning, TEXT("[AI] Player exceeded leash distance — returning to patrol"));
-
+            bIsMovingToTarget = false;
             CurrentTarget = nullptr;
 
             // Start healing if needed
@@ -911,29 +967,53 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
             return;
         }
 
+        if (OverridesChaseMovement())
+        {
+            return;
+        }
+
         // MOVE TOWARD PLAYER ONLY IF OUTSIDE ATTACK RANGE
         if (Distance > AttackRange)
         {
-            if (AARPGEnemyAIController* AICon = GetEnemyAIController())
+            // Allow subclasses to handle their own movement
+            if (!OverridesChaseMovement() && !bIsMovingToTarget)
             {
-                UE_LOG(LogTemp, Warning, TEXT("[AI] Calling MoveToActor"));
-
-                EPathFollowingRequestResult::Type Result =
-                    AICon->MoveToActor(CurrentTarget, 5.f);
-
-                switch (Result)
+                if (AARPGEnemyAIController* AICon = GetEnemyAIController())
                 {
-                case EPathFollowingRequestResult::Failed:
-                    UE_LOG(LogTemp, Error, TEXT("[AI] MoveToActor FAILED"));
-                    break;
+                    UE_LOG(LogTemp, Warning,
+                        TEXT("[BASE CHASE BEFORE] Dist=%.1f Overrides=%d MovingToTarget(before)=%d"),
+                        Distance,
+                        OverridesChaseMovement() ? 1 : 0,
+                        bIsMovingToTarget ? 1 : 0
+                    );
 
-                case EPathFollowingRequestResult::AlreadyAtGoal:
-                    UE_LOG(LogTemp, Warning, TEXT("[AI] MoveToActor: Already at goal"));
-                    break;
+                    UE_LOG(LogTemp, Warning, TEXT("[AI] Calling MoveToActor"));
+                    EPathFollowingRequestResult::Type Result =
+                        AICon->MoveToActor(CurrentTarget, 5.f);
 
-                case EPathFollowingRequestResult::RequestSuccessful:
-                    UE_LOG(LogTemp, Warning, TEXT("[AI] MoveToActor: Request Successful"));
-                    break;
+                    switch (Result)
+                    {
+                    case EPathFollowingRequestResult::Failed:
+                        UE_LOG(LogTemp, Error, TEXT("[AI] MoveToActor FAILED"));
+                        bIsMovingToTarget = false;
+                        break;
+
+                    case EPathFollowingRequestResult::AlreadyAtGoal:
+                        UE_LOG(LogTemp, Warning, TEXT("[AI] MoveToActor: Already at goal"));
+                        bIsMovingToTarget = false;
+                        break;
+
+                    case EPathFollowingRequestResult::RequestSuccessful:
+                        UE_LOG(LogTemp, Warning, TEXT("[AI] MoveToActor: Request Successful"));
+                        bIsMovingToTarget = true;
+                        break;
+                    }
+
+                    UE_LOG(LogTemp, Warning,
+                        TEXT("[BASE CHASE AFTER] MoveToActor result=%d MovingToTarget(after)=%d"),
+                        (int32)Result,
+                        bIsMovingToTarget ? 1 : 0
+                    );
                 }
             }
         }
@@ -967,12 +1047,6 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
                 BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
 
             SetEnemyState(EEnemyState::Chase);
-
-            if (AARPGEnemyAIController* AICon = GetEnemyAIController())
-            {
-                AICon->MoveToActor(CurrentTarget, 5.f);
-            }
-
             return;
         }
 
