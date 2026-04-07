@@ -40,7 +40,7 @@ protected:
     TSubclassOf<AARPGEnemyProjectile> ProjectileClass;
 
     UPROPERTY(EditAnywhere, Category = "Ranged Combat")
-    float ProjectileDamage = 10.f;
+    float ProjectileDamage = 20.f;
 
     // Firing timing
     UPROPERTY(EditAnywhere, Category = "Ranged Combat")
