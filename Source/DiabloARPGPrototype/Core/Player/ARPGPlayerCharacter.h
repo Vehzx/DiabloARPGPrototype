@@ -22,8 +22,13 @@ public:
     virtual void Tick(float DeltaTime) override;
     void ApplyKnockback(const FVector& Direction, float Strength);
 
+    void TogglePause();
+
 protected:
     virtual void BeginPlay() override;
+
+    UPROPERTY(EditAnywhere, Category = "UI")
+    TSubclassOf<UUserWidget> PauseMenuWidgetClass;
 
     /** Input bindings */
     virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -57,6 +62,8 @@ protected:
     TSubclassOf<UCameraShakeBase> HitCameraShake;
 
 private:
+    UUserWidget* PauseMenuWidgetInstance;
+    bool bIsPaused = false;
 
     // ============================================================
     // Components
