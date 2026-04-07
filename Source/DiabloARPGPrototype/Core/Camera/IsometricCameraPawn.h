@@ -26,6 +26,9 @@ private:
     UPROPERTY(VisibleAnywhere)
     class USpringArmComponent* SpringArm;
 
+    UPROPERTY(EditAnywhere, Category = "Lighting")
+    AActor* FollowSpotLight;
+
     UPROPERTY(VisibleAnywhere)
     class UCameraComponent* Camera;
 

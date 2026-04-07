@@ -153,17 +153,17 @@ void AARPGEnemyCharacter::BeginPlay()
     Super::BeginPlay();
     SpawnLocation = GetActorLocation();
 
-    for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+    // Start in Patrol or Idle depending on editor-assigned patrol points
+    if (PatrolPoints.Num() > 0)
     {
-        if (It->ActorHasTag("PatrolPoint"))
-        {
-            PatrolPoints.Add(*It);
-            UE_LOG(LogTemp, Warning, TEXT("[PATROL] Added patrol point: %s"), *It->GetName());
-        }
+        UE_LOG(LogTemp, Warning, TEXT("[PATROL] Using %d patrol points assigned in editor"), PatrolPoints.Num());
+        SetEnemyState(EEnemyState::Patrol);
     }
-
-    UE_LOG(LogTemp, Warning, TEXT("PatrolPoints.Num() at runtime = %d"), PatrolPoints.Num());
-
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[PATROL] No patrol points assigned — starting idle"));
+        SetEnemyState(EEnemyState::Idle);
+    }
 
     // Ensure enemy starts with correct base colour (same as player)
     BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
@@ -180,11 +180,6 @@ void AARPGEnemyCharacter::BeginPlay()
             HB->InitializeHealth(HealthComponent);
         }
     }
-
-    if (PatrolPoints.Num() > 0)
-    {
-        SetEnemyState(EEnemyState::Patrol);
-    }
 }
 
 AARPGEnemyAIController* AARPGEnemyCharacter::GetEnemyAIController() const
@@ -195,6 +190,9 @@ AARPGEnemyAIController* AARPGEnemyCharacter::GetEnemyAIController() const
 void AARPGEnemyCharacter::HandleDeath()
 {
     UE_LOG(LogTemp, Warning, TEXT("Enemy died"));
+
+    // Stop all timers to prevent callbacks on a destroyed actor
+    GetWorldTimerManager().ClearAllTimersForObject(this);
 
     GetCharacterMovement()->DisableMovement();
     GetMesh()->SetVisibility(false, true);
