@@ -1,4 +1,5 @@
 #include "ARPGPlayerCharacter.h"
+#include "ARPGMeleeSwingActor.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/WidgetComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -111,6 +112,16 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
     if (PauseMenuClass.Succeeded())
     {
         PauseMenuWidgetClass = PauseMenuClass.Class;
+    }
+
+    // Attack Visual
+    static ConstructorHelpers::FClassFinder<AARPGMeleeSwingActor> SwingClassFinder(
+        TEXT("/Game/UI/BP_MeleeSwing.BP_MeleeSwing_C")
+    );
+
+    if (SwingClassFinder.Succeeded())
+    {
+        MeleeSwingClass = SwingClassFinder.Class;
     }
 }
 
@@ -292,9 +303,21 @@ void AARPGPlayerCharacter::PerformTestAttack()
     // --- DEBUG: Trace result ---
     UE_LOG(LogTemp, Warning, TEXT("[ATTACK TRACE] bHit = %s"), bHit ? TEXT("TRUE") : TEXT("FALSE"));
 
-    // Debug visuals
-    DrawDebugLine(GetWorld(), Start, End, FColor::Red, false, 1.f, 0, 2.f);
-    DrawDebugSphere(GetWorld(), End, Radius, 12, FColor::Red, false, 1.f);
+    // Visual
+    FVector SwingLocation = Start + Forward * 100.f;
+    FRotator SwingRotation = GetActorRotation();
+    FActorSpawnParameters SwingParams;
+    SwingParams.Owner = this;
+
+    if (MeleeSwingClass)
+    {
+        GetWorld()->SpawnActor<AARPGMeleeSwingActor>(
+            MeleeSwingClass,
+            SwingLocation,
+            SwingRotation,
+            SwingParams
+        );
+    }
 
     if (bHit)
     {

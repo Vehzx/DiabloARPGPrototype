@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "ARPGMeleeSwingActor.h"
 #include "ARPGPlayerCharacter.generated.h"
 
 // Forward declarations
@@ -102,6 +103,9 @@ private:
     // ============================================================
     // Combat
     // ============================================================
+
+    UPROPERTY(EditAnywhere, Category = "Combat")
+    TSubclassOf<AARPGMeleeSwingActor> MeleeSwingClass;
 
     UPROPERTY(EditAnywhere, Category = "Combat")
     float AttackCooldown = 0.8f;
