@@ -687,18 +687,7 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
 
     TimeSinceLastAttack += DeltaTime;
 
-    // --- NAVMESH CHECK ---
     UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(GetWorld());
-    if (NavSys)
-    {
-        FNavLocation OutLocation;
-        bool bOnNav = NavSys->ProjectPointToNavigation(GetActorLocation(), OutLocation);
-
-        if (!bOnNav)
-        {
-            UE_LOG(LogTemp, Error, TEXT("[AI] Enemy is NOT on the NavMesh!"));
-        }
-    }
 
     // --- PATROL LOGIC ---
     if (CurrentState == EEnemyState::Patrol)
@@ -926,7 +915,7 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
 
         // LEASH CHECK (DISTANCE FROM PLAYER)
         float DistanceToPlayer = FVector::Dist2D(GetActorLocation(), CurrentTarget->GetActorLocation());
-        const float PlayerLeashDistance = 900.f;
+        const float PlayerLeashDistance = GetPlayerLeashDistance();
 
         if (DistanceToPlayer > PlayerLeashDistance)
         {

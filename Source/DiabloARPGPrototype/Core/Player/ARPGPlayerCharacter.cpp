@@ -472,9 +472,6 @@ void AARPGPlayerCharacter::Tick(float DeltaTime)
     FHitResult Hit;
     PC->GetHitResultUnderCursor(ECC_Visibility, false, Hit);
 
-    // Track which enemy was hovered last frame
-    static AARPGEnemyCharacter* LastHoveredEnemy = nullptr;
-
     // Check if we are hovering an enemy
     AARPGEnemyCharacter* HoveredEnemy = Cast<AARPGEnemyCharacter>(Hit.GetActor());
 
@@ -500,15 +497,29 @@ void AARPGPlayerCharacter::HandleDeath()
 {
     UE_LOG(LogTemp, Warning, TEXT("Player has died"));
 
-    DisableInput(nullptr);
-    GetCharacterMovement()->DisableMovement();
-    GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    bIsDying = true;
-    SetLifeSpan(2.0f); // extend lifespan to give widget time to show
-
-    // Show Game Over screen after short delay
+    // Safely disable input
     APlayerController* PC = Cast<APlayerController>(GetController());
     if (PC)
+    {
+        DisableInput(PC);
+    }
+
+    // Disable movement
+    if (GetCharacterMovement())
+        GetCharacterMovement()->DisableMovement();
+
+    // Disable collision
+    if (GetCapsuleComponent())
+        GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    // Begin shrinking
+    bIsDying = true;
+
+    // Extend lifespan to give widget time to show
+    SetLifeSpan(2.0f);
+
+    // Show Game Over screen
+    if (PC && GameOverWidgetClass)
     {
         PC->bShowMouseCursor = true;
         PC->SetInputMode(FInputModeUIOnly());

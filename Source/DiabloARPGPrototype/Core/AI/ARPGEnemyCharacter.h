@@ -48,10 +48,10 @@ public:
 
     FTimerHandle StaggerTimerHandle;
 
-    void EnterStagger(float Duration);
+    virtual void EnterStagger(float Duration);
     void ExitStagger();
 
-    void OnDamaged(AActor* DamageCauser);
+    virtual void OnDamaged(AActor* DamageCauser);
 
     UPROPERTY(VisibleAnywhere, Category = "AI")
     EEnemyState CurrentState = EEnemyState::Idle;
@@ -79,6 +79,18 @@ public:
     void ShowHoverDecal();
     void HideHoverDecal();
 
+    UPROPERTY(EditAnywhere, Category = "Combat")
+    float AttackDamage = 15.f;
+
+    UPROPERTY(VisibleAnywhere, Category = "Components")
+    UHealthComponent* HealthComponent;
+
+    void SetEnemyState(EEnemyState NewState);
+
+    virtual bool CanBeKnockedBack() const { return true; }
+
+    virtual float GetPlayerLeashDistance() const { return 900.f; }
+
 protected:
     virtual void BeginPlay() override;
 
@@ -98,6 +110,12 @@ protected:
 
     float TimeInChaseWithoutPath = 0.f;
 
+    // AI Perception
+    UPROPERTY(VisibleAnywhere, Category = "AI")
+    UAIPerceptionComponent* PerceptionComponent;
+
+    UPROPERTY()
+    UAISenseConfig_Sight* SightConfig;
 
 private:
 
@@ -106,20 +124,12 @@ private:
     UStaticMeshComponent* BodyMesh;
 
     UPROPERTY(VisibleAnywhere, Category = "Components")
-    UHealthComponent* HealthComponent;
-
-    UPROPERTY(VisibleAnywhere, Category = "Components")
     UWidgetComponent* HealthBarWidgetComponent;
 
     UFUNCTION()
     void HandleDeath();
 
     // AI Perception
-    UPROPERTY(VisibleAnywhere, Category = "AI")
-    UAIPerceptionComponent* PerceptionComponent;
-
-    UPROPERTY()
-    UAISenseConfig_Sight* SightConfig;
 
     UPROPERTY()
     UAISenseConfig_Hearing* HearingConfig;
@@ -132,7 +142,6 @@ private:
 
     // Enemy State Machine
 
-    void SetEnemyState(EEnemyState NewState);
     void HandleStateChanged(EEnemyState OldState, EEnemyState NewState);
 
     // PATROL SYSTEM
@@ -157,9 +166,6 @@ private:
     void AdvancePatrol();
 
     // Combat
-
-    UPROPERTY(EditAnywhere, Category = "Combat")
-    float AttackDamage = 15.f;
 
     UPROPERTY(EditAnywhere, Category = "Combat")
     float AttackWindupTime = 0.5f;
