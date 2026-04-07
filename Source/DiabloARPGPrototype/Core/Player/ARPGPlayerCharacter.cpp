@@ -114,6 +114,21 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
         PauseMenuWidgetClass = PauseMenuClass.Class;
     }
 
+    // Game Over Setup
+    static ConstructorHelpers::FClassFinder<UUserWidget> GameOverClass(
+        TEXT("/Game/UI/WBP_GameOver.WBP_GameOver_C")
+    );
+
+    if (GameOverClass.Succeeded())
+    {
+        GameOverWidgetClass = GameOverClass.Class;
+        UE_LOG(LogTemp, Warning, TEXT("[PLAYER] GameOverWidgetClass loaded successfully"));
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("[PLAYER] GameOverWidgetClass FAILED to load — check path"));
+    }
+
     // Attack Visual
     static ConstructorHelpers::FClassFinder<AARPGMeleeSwingActor> SwingClassFinder(
         TEXT("/Game/UI/BP_MeleeSwing.BP_MeleeSwing_C")
@@ -485,18 +500,37 @@ void AARPGPlayerCharacter::HandleDeath()
 {
     UE_LOG(LogTemp, Warning, TEXT("Player has died"));
 
-    // Disable input
     DisableInput(nullptr);
-
-    // Disable movement
     GetCharacterMovement()->DisableMovement();
-
-    // Disable collision
     GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-    // Begin shrinking
     bIsDying = true;
+    SetLifeSpan(2.0f); // extend lifespan to give widget time to show
 
-    // Destroy after 1 second
-    SetLifeSpan(1.0f);
+    // Show Game Over screen after short delay
+    APlayerController* PC = Cast<APlayerController>(GetController());
+    if (PC)
+    {
+        PC->bShowMouseCursor = true;
+        PC->SetInputMode(FInputModeUIOnly());
+    }
+
+    FTimerHandle GameOverTimer;
+    GetWorldTimerManager().SetTimer(
+        GameOverTimer,
+        [this]()
+        {
+            APlayerController* PC = Cast<APlayerController>(GetController());
+            if (PC && GameOverWidgetClass)
+            {
+                GameOverWidgetInstance = CreateWidget<UUserWidget>(PC, GameOverWidgetClass);
+                if (GameOverWidgetInstance)
+                {
+                    GameOverWidgetInstance->AddToViewport();
+                    UGameplayStatics::SetGamePaused(this, true);
+                }
+            }
+        },
+        0.8f,
+        false
+    );
 }
