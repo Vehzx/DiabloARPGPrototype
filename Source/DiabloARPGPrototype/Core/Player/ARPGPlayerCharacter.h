@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "ARPGMeleeSwingActor.h"
+#include "DiabloARPGPrototype/Core/AI/ARPGEnemyCharacter.h"
 #include "ARPGPlayerCharacter.generated.h"
 
 // Forward declarations
@@ -24,6 +25,9 @@ public:
     void ApplyKnockback(const FVector& Direction, float Strength);
 
     void TogglePause();
+
+    UPROPERTY()
+    AARPGEnemyCharacter* LastHoveredEnemy = nullptr;
 
 protected:
     virtual void BeginPlay() override;

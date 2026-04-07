@@ -32,6 +32,8 @@ public:
 
     bool IsDead() const { return bIsDead; }
 
+    void SetMaxHealth(float NewMaxHealth);
+
     // ------------------------------------------------------------
     // Events
     // ------------------------------------------------------------

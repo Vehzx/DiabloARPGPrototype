@@ -59,7 +59,10 @@ void UHealthComponent::ApplyDamage(float DamageAmount, AActor* DamageCauser)
         }
         else if (AARPGEnemyCharacter* Enemy = Cast<AARPGEnemyCharacter>(Owner))
         {
-            Enemy->ApplyKnockback(KnockDir, 300.f);
+            if (Enemy->CanBeKnockedBack())
+            {
+                Enemy->ApplyKnockback(KnockDir, 300.f);
+            }
         }
     }
 
@@ -70,6 +73,13 @@ void UHealthComponent::ApplyDamage(float DamageAmount, AActor* DamageCauser)
         UE_LOG(LogTemp, Warning, TEXT("[HEALTH] %s has died."), *Owner->GetName());
         HandleDeath();
     }
+}
+
+void UHealthComponent::SetMaxHealth(float NewMaxHealth)
+{
+    MaxHealth = NewMaxHealth;
+    CurrentHealth = NewMaxHealth;
+    OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
 }
 
 void UHealthComponent::Heal(float HealAmount)
