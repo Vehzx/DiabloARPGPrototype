@@ -62,9 +62,17 @@ protected:
     UPROPERTY(EditAnywhere, Category = "Camera")
     TSubclassOf<UCameraShakeBase> HitCameraShake;
 
+    // UI
+    UPROPERTY(EditAnywhere, Category = "UI")
+    TSubclassOf<UUserWidget> GameOverWidgetClass;
+
 private:
+    // UI
     UUserWidget* PauseMenuWidgetInstance;
     bool bIsPaused = false;
+
+    UPROPERTY()
+    UUserWidget* GameOverWidgetInstance;
 
     // ============================================================
     // Components
