@@ -4,6 +4,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/StaticMesh.h"
+#include "Kismet/GameplayStatics.h"
 #include "DiabloARPGPrototype/Core/Player/UHealthComponent.h"
 #include "DiabloARPGPrototype/Core/Player/WHealthBarWidget.h"
 #include "DiabloARPGPrototype/Core/UI/DamageNumberActor.h"
@@ -100,6 +101,17 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
 
     // Optional: make capsule visible for debugging
     GetCapsuleComponent()->SetHiddenInGame(false);
+
+
+    // Pause Menu Setup
+    static ConstructorHelpers::FClassFinder<UUserWidget> PauseMenuClass(
+        TEXT("/Game/UI/WBP_PauseMenu.WBP_PauseMenu_C")
+    );
+
+    if (PauseMenuClass.Succeeded())
+    {
+        PauseMenuWidgetClass = PauseMenuClass.Class;
+    }
 }
 
 void AARPGPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -111,6 +123,45 @@ void AARPGPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 
     PlayerInputComponent->BindAction("TestAttack", IE_Pressed, this, &AARPGPlayerCharacter::PerformTestAttack);
     PlayerInputComponent->BindAction("Dash", IE_Pressed, this, &AARPGPlayerCharacter::Dash);
+
+    PlayerInputComponent->BindAction("Pause", IE_Pressed, this, &AARPGPlayerCharacter::TogglePause);
+}
+
+void AARPGPlayerCharacter::TogglePause()
+{
+    APlayerController* PC = Cast<APlayerController>(GetController());
+    if (!PC) return;
+
+    if (!bIsPaused)
+    {
+        // Pause
+        if (PauseMenuWidgetClass)
+        {
+            PauseMenuWidgetInstance = CreateWidget<UUserWidget>(PC, PauseMenuWidgetClass);
+            if (PauseMenuWidgetInstance)
+            {
+                PauseMenuWidgetInstance->AddToViewport();
+                UGameplayStatics::SetGamePaused(this, true);
+                PC->bShowMouseCursor = true;
+                PC->SetInputMode(FInputModeUIOnly());
+                bIsPaused = true;
+            }
+        }
+    }
+    else
+    {
+        // Resume
+        if (PauseMenuWidgetInstance)
+        {
+            PauseMenuWidgetInstance->RemoveFromParent();
+            PauseMenuWidgetInstance = nullptr;
+        }
+
+        UGameplayStatics::SetGamePaused(this, false);
+        PC->bShowMouseCursor = false;
+        PC->SetInputMode(FInputModeGameOnly());
+        bIsPaused = false;
+    }
 }
 
 FVector AARPGPlayerCharacter::GetMovementDirection() const
