@@ -1,4 +1,6 @@
 #include "ARPGBossCharacter.h"
+#include "DiabloARPGPrototype/Core/UI/YouWinWidget.h"
+#include "Kismet/GameplayStatics.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "DiabloARPGPrototype/Core/Player/UHealthComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
@@ -34,7 +36,25 @@ void AARPGBossCharacter::BeginPlay()
     Super::BeginPlay();
 
     if (HealthComponent)
+    {
         HealthComponent->SetMaxHealth(500.f);
+        UE_LOG(LogTemp, Warning, TEXT("[BOSS] OnDeath delegate bound successfully"));
+    }
+
+    // Load YouWin widget class at runtime
+    if (!YouWinWidgetClass)
+    {
+        YouWinWidgetClass = StaticLoadClass(
+            UUserWidget::StaticClass(),
+            nullptr,
+            TEXT("/Game/UI/WBP_YouWin.WBP_YouWin_C")
+        );
+
+        if (YouWinWidgetClass)
+            UE_LOG(LogTemp, Warning, TEXT("[BOSS] YouWinWidgetClass loaded successfully"))
+        else
+            UE_LOG(LogTemp, Error, TEXT("[BOSS] YouWinWidgetClass FAILED to load"));
+    }
 
     // Override movement speed
     if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
@@ -68,6 +88,28 @@ void AARPGBossCharacter::OnDamaged(AActor* DamageCauser)
     {
         SetEnemyState(EEnemyState::Chase);
     }
+}
+
+void AARPGBossCharacter::HandleDeath()
+{
+    UE_LOG(LogTemp, Warning, TEXT("[BOSS] Boss defeated — showing You Win screen"));
+
+    // Show You Win widget before calling Super which destroys the actor
+    APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+    if (PC && YouWinWidgetClass)
+    {
+        YouWinWidgetInstance = CreateWidget<UUserWidget>(PC, YouWinWidgetClass);
+        if (YouWinWidgetInstance)
+        {
+            YouWinWidgetInstance->AddToViewport();
+            UGameplayStatics::SetGamePaused(this, true);
+            PC->bShowMouseCursor = true;
+            PC->SetInputMode(FInputModeUIOnly());
+        }
+    }
+
+    // Call base class death handling after widget is shown
+    Super::HandleDeath();
 }
 
 void AARPGBossCharacter::EnterStagger(float Duration)

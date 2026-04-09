@@ -242,54 +242,53 @@ void AARPGEnemyCharacter::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus S
     // --- PLAYER LOST (but maybe only for a moment) ---
     GetWorldTimerManager().ClearTimer(LostSightTimer);
 
+    TWeakObjectPtr<AARPGEnemyCharacter> WeakThis(this);
+
     GetWorldTimerManager().SetTimer(
         LostSightTimer,
-        [this]()
+        [WeakThis]()
         {
-            if (CurrentState == EEnemyState::Flee)
+            if (!WeakThis.IsValid())
                 return;
 
-            bPlayerReallyLost = true;
+            if (WeakThis->CurrentState == EEnemyState::Flee)
+                return;
 
-            // Re-check perception before deciding the player is REALLY lost
-            AActor* Player = UGameplayStatics::GetPlayerCharacter(this, 0);
+            WeakThis->bPlayerReallyLost = true;
+
+            AActor* Player = UGameplayStatics::GetPlayerCharacter(WeakThis.Get(), 0);
 
             bool bStillNoSight =
-                PerceptionComponent &&
-                !PerceptionComponent->HasActiveStimulus(*Player, UAISense::GetSenseID<UAISense_Sight>());
+                WeakThis->PerceptionComponent &&
+                !WeakThis->PerceptionComponent->HasActiveStimulus(*Player, UAISense::GetSenseID<UAISense_Sight>());
 
-            // Only allow "really lost" if NOT in combat
             bool bInCombat =
-                CurrentState == EEnemyState::Chase ||
-                CurrentState == EEnemyState::Attack ||
-                CurrentState == EEnemyState::Stagger ||
-                CurrentState == EEnemyState::Flee;
+                WeakThis->CurrentState == EEnemyState::Chase ||
+                WeakThis->CurrentState == EEnemyState::Attack ||
+                WeakThis->CurrentState == EEnemyState::Stagger ||
+                WeakThis->CurrentState == EEnemyState::Flee;
 
             if (bStillNoSight && !bInCombat)
             {
                 UE_LOG(LogTemp, Warning, TEXT("[AI] Player REALLY lost — returning to patrol"));
 
-                CurrentTarget = nullptr;
+                WeakThis->CurrentTarget = nullptr;
 
-                if (HealthComponent)
+                if (WeakThis->HealthComponent)
                 {
-                    GetWorldTimerManager().SetTimer(
-                        HealOverTimeTimer,
-                        this,
+                    WeakThis->GetWorldTimerManager().SetTimer(
+                        WeakThis->HealOverTimeTimer,
+                        WeakThis.Get(),
                         &AARPGEnemyCharacter::HealOverTimeTick,
                         0.2f,
                         true
                     );
                 }
 
-                if (PatrolPoints.Num() > 0)
-                {
-                    SetEnemyState(EEnemyState::Patrol);
-                }
+                if (WeakThis->PatrolPoints.Num() > 0)
+                    WeakThis->SetEnemyState(EEnemyState::Patrol);
                 else
-                {
-                    SetEnemyState(EEnemyState::Idle);
-                }
+                    WeakThis->SetEnemyState(EEnemyState::Idle);
             }
             else
             {
@@ -622,12 +621,14 @@ void AARPGEnemyCharacter::FlashOnHit()
 
     BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(1.0f, 0.0f, 0.0f));
 
+    TWeakObjectPtr<AARPGEnemyCharacter> WeakThis(this);
+
     FTimerHandle TimerHandle;
-    GetWorldTimerManager().SetTimer(TimerHandle, [this]()
+    GetWorldTimerManager().SetTimer(TimerHandle, [WeakThis]()
         {
-            if (BodyMesh)
+            if (WeakThis.IsValid() && WeakThis->BodyMesh)
             {
-                BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
+                WeakThis->BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
             }
         }, 0.8f, false);
 }
