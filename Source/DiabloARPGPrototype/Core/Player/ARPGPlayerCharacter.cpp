@@ -385,17 +385,29 @@ void AARPGPlayerCharacter::FlashOnHit()
 {
     if (!BodyMesh) return;
 
-    // Flash red briefly
+    // Flash briefly
     BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(1.0f, 0.0f, 0.0f));
 
+    TWeakObjectPtr<AARPGPlayerCharacter> WeakThis(this);
+
     FTimerHandle TimerHandle;
-    GetWorldTimerManager().SetTimer(TimerHandle, [this]()
+    GetWorldTimerManager().SetTimer(
+        TimerHandle,
+        [WeakThis]()
         {
-            if (BodyMesh)
+            if (!WeakThis.IsValid()) return;
+
+            if (WeakThis->BodyMesh)
             {
-                BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(0.5f, 0.5f, 0.5f));
+                WeakThis->BodyMesh->SetVectorParameterValueOnMaterials(
+                    "BaseColour",
+                    FVector(0.5f, 0.5f, 0.5f)
+                );
             }
-        }, 0.2f, false);
+        },
+        0.2f,
+        false
+    );
 }
 
 void AARPGPlayerCharacter::ApplyKnockback(const FVector& Direction, float Strength)
