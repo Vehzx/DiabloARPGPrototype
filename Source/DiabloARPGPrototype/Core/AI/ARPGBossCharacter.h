@@ -23,4 +23,13 @@ public:
 
 protected:
     virtual void BeginPlay() override;
+
+    UPROPERTY(EditAnywhere, Category = "UI")
+    TSubclassOf<UUserWidget> YouWinWidgetClass;
+
+    virtual void HandleDeath() override;
+
+private:
+    UPROPERTY()
+    UUserWidget* YouWinWidgetInstance;
 };

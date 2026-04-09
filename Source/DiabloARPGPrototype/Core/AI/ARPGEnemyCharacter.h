@@ -117,6 +117,9 @@ protected:
     UPROPERTY()
     UAISenseConfig_Sight* SightConfig;
 
+    UFUNCTION()
+    virtual void HandleDeath();
+
 private:
 
     // Components
@@ -125,9 +128,6 @@ private:
 
     UPROPERTY(VisibleAnywhere, Category = "Components")
     UWidgetComponent* HealthBarWidgetComponent;
-
-    UFUNCTION()
-    void HandleDeath();
 
     // AI Perception
 
