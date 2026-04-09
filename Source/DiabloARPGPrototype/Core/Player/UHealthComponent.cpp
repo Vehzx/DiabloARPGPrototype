@@ -18,11 +18,7 @@ void UHealthComponent::BeginPlay()
 void UHealthComponent::ApplyDamage(float DamageAmount, AActor* DamageCauser)
 {
     if (bIsDead || DamageAmount <= 0.f)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[HEALTH] %s cannot take damage (Dead or invalid amount)."),
-            *GetOwner()->GetName());
         return;
-    }
 
     AActor* Owner = GetOwner();
     if (!Owner)
@@ -31,10 +27,7 @@ void UHealthComponent::ApplyDamage(float DamageAmount, AActor* DamageCauser)
     float OldHealth = CurrentHealth;
     CurrentHealth = FMath::Clamp(CurrentHealth - DamageAmount, 0.f, MaxHealth);
 
-    UE_LOG(LogTemp, Warning, TEXT("[HEALTH] %s took %f damage. Health: %.1f -> %.1f"),
-        *Owner->GetName(), DamageAmount, OldHealth, CurrentHealth);
-
-    // Hit flash
+    // Visual hit feedback
     if (AARPGPlayerCharacter* Player = Cast<AARPGPlayerCharacter>(Owner))
     {
         Player->FlashOnHit();
@@ -43,8 +36,6 @@ void UHealthComponent::ApplyDamage(float DamageAmount, AActor* DamageCauser)
     {
         Enemy->FlashOnHit();
         Enemy->EnterStagger(0.3f);
-
-        // Tell the enemy who damaged it
         Enemy->OnDamaged(DamageCauser);
     }
 
@@ -68,9 +59,9 @@ void UHealthComponent::ApplyDamage(float DamageAmount, AActor* DamageCauser)
 
     OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
 
+    // Death check
     if (CurrentHealth <= 0.f)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[HEALTH] %s has died."), *Owner->GetName());
         HandleDeath();
     }
 }

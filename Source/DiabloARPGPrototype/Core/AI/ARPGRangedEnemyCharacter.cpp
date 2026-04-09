@@ -40,7 +40,6 @@ void AARPGRangedEnemyCharacter::HandleRangedCombatTick(float DeltaTime)
 
     if (CurrentState != EEnemyState::Chase)
     {
-        // Make sure orientation is restored if we leave chase for any reason
         GetCharacterMovement()->bOrientRotationToMovement = true;
         bIsRetreating = false;
 
@@ -53,17 +52,7 @@ void AARPGRangedEnemyCharacter::HandleRangedCombatTick(float DeltaTime)
 
     float DistToPlayer = FVector::Dist2D(GetActorLocation(), CurrentTarget->GetActorLocation());
 
-    UE_LOG(LogTemp, Warning,
-        TEXT("[RANGED DEBUG] State=%s Dist=%.1f Ret=%d FirePos=%d MovingToTarget=%d Overrides=%d"),
-        *UEnum::GetValueAsString(CurrentState),
-        DistToPlayer,
-        bIsRetreating ? 1 : 0,
-        bIsInFiringPosition ? 1 : 0,
-        bIsMovingToTarget ? 1 : 0,
-        OverridesChaseMovement() ? 1 : 0
-    );
-
-    // --- TOO CLOSE: retreat ---
+    // RANGED AI RETREAT LOGIC
     if (DistToPlayer < PreferredMinRange)
     {
         bIsMovingToTarget = false;
@@ -109,7 +98,6 @@ void AARPGRangedEnemyCharacter::HandleRangedCombatTick(float DeltaTime)
         }
         else
         {
-            UE_LOG(LogTemp, Warning, TEXT("[RANGED] Cornered, firing from close range"));
             bIsRetreating = false;
 
             if (LowHealthIcon)
@@ -127,13 +115,12 @@ void AARPGRangedEnemyCharacter::HandleRangedCombatTick(float DeltaTime)
     if (LowHealthIcon)
         LowHealthIcon->SetHiddenInGame(true);
 
-    // --- IN PREFERRED RANGE: stop and fire ---
+    // RANGED AI SHOOT LOGIC
     if (DistToPlayer >= PreferredMinRange && DistToPlayer <= PreferredMaxRange)
     {
         bIsMovingToTarget = false;
         GetCharacterMovement()->bOrientRotationToMovement = false;
 
-        // Face the player
         FVector Dir = CurrentTarget->GetActorLocation() - GetActorLocation();
         Dir.Z = 0;
         SetActorRotation(Dir.Rotation());
@@ -166,7 +153,7 @@ void AARPGRangedEnemyCharacter::HandleRangedCombatTick(float DeltaTime)
         return;
     }
 
-    // --- TOO FAR: chase ---
+    // Chase when too far to shoot
     bIsInFiringPosition = false;
     bFiringDelayActive = false;
     GetWorldTimerManager().ClearTimer(FiringDelayTimer);
@@ -179,8 +166,6 @@ void AARPGRangedEnemyCharacter::HandleRangedCombatTick(float DeltaTime)
 
     if (AARPGEnemyAIController* AICon = GetEnemyAIController())
     {
-        // Move toward the player, but we don't need to get all the way on top of them.
-        // We just want to get inside our preferred band.
         const float AcceptanceRadius = PreferredMaxRange - 150;
 
         AICon->MoveToActor(CurrentTarget, AcceptanceRadius);
@@ -192,8 +177,6 @@ void AARPGRangedEnemyCharacter::FireProjectile()
 {
     if (!ProjectileClass || !CurrentTarget)
         return;
-
-    UE_LOG(LogTemp, Warning, TEXT("[RANGED] Firing projectile at %s"), *CurrentTarget->GetName());
 
     FVector Direction = (CurrentTarget->GetActorLocation() - GetActorLocation()).GetSafeNormal();
     FVector ProjectileSpawnLocation = GetActorLocation() + FVector(0.f, 0.f, 50.f) + Direction * 80.f;

@@ -17,7 +17,6 @@ AARPGBossCharacter::AARPGBossCharacter()
         MoveComp->MaxWalkSpeed = 150.f;
     }
 
-    // Higher health — override in BeginPlay via HealthComponent
     // Larger attack range to match bigger size
     AttackRange = 250.f;
 
@@ -38,10 +37,10 @@ void AARPGBossCharacter::BeginPlay()
     if (HealthComponent)
     {
         HealthComponent->SetMaxHealth(500.f);
-        UE_LOG(LogTemp, Warning, TEXT("[BOSS] OnDeath delegate bound successfully"));
     }
 
-    // Load YouWin widget class at runtime
+    // Load the You Win widget at runtime rather than via ConstructorHelpers,
+    // which is unreliable for Widget Blueprints in packaged builds.
     if (!YouWinWidgetClass)
     {
         YouWinWidgetClass = StaticLoadClass(
@@ -49,18 +48,13 @@ void AARPGBossCharacter::BeginPlay()
             nullptr,
             TEXT("/Game/UI/WBP_YouWin.WBP_YouWin_C")
         );
-
-        if (YouWinWidgetClass)
-            UE_LOG(LogTemp, Warning, TEXT("[BOSS] YouWinWidgetClass loaded successfully"))
-        else
-            UE_LOG(LogTemp, Error, TEXT("[BOSS] YouWinWidgetClass FAILED to load"));
     }
 
-    // Override movement speed
     if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
         MoveComp->MaxWalkSpeed = 250.f;
 
-    // Override sight perception
+    // Reconfigure perception at runtime so the boss detects the player
+    // across a large room regardless of base class defaults.
     if (SightConfig)
     {
         SightConfig->SightRadius = 2000.f;
@@ -71,7 +65,7 @@ void AARPGBossCharacter::BeginPlay()
             PerceptionComponent->ConfigureSense(*SightConfig);
     }
 
-    // Boss never leashes, once aggro it always chases
+    // Disable leashing, the boss should always pursue once aggroed.
     LeashRadius = 99999.f;
 }
 
@@ -82,7 +76,8 @@ void AARPGBossCharacter::OnDamaged(AActor* DamageCauser)
 
     CurrentTarget = DamageCauser;
 
-    // Boss never panics or flees — always chases
+    // The boss skips the base class Panic/Flee threshold check entirely.
+    // Any damage that does not interrupt an active Attack forces Chase.
     if (CurrentState != EEnemyState::Chase &&
         CurrentState != EEnemyState::Attack)
     {
@@ -92,9 +87,8 @@ void AARPGBossCharacter::OnDamaged(AActor* DamageCauser)
 
 void AARPGBossCharacter::HandleDeath()
 {
-    UE_LOG(LogTemp, Warning, TEXT("[BOSS] Boss defeated — showing You Win screen"));
-
-    // Show You Win widget before calling Super which destroys the actor
+    // Present the You Win screen before destroying the actor.
+    // Creating the widget on the PlayerController ensures it persists after destruction.
     APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
     if (PC && YouWinWidgetClass)
     {
@@ -107,13 +101,10 @@ void AARPGBossCharacter::HandleDeath()
             PC->SetInputMode(FInputModeUIOnly());
         }
     }
-
-    // Call base class death handling after widget is shown
     Super::HandleDeath();
 }
 
 void AARPGBossCharacter::EnterStagger(float Duration)
 {
     // Boss is immune to stagger — do nothing
-    UE_LOG(LogTemp, Warning, TEXT("[BOSS] Stagger ignored — boss is immune"));
 }

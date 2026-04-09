@@ -19,7 +19,6 @@ void AMainMenuGameMode::BeginPlay()
         {
             MainMenuWidgetInstance->AddToViewport();
 
-            // Show cursor and enable UI input
             APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
             if (PC)
             {
