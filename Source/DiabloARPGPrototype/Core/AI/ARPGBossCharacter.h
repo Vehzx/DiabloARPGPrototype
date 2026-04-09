@@ -12,7 +12,6 @@ class DIABLOARPGPROTOTYPE_API AARPGBossCharacter : public AARPGEnemyCharacter
 public:
     AARPGBossCharacter();
 
-    // Override stagger to make boss immune
     virtual void EnterStagger(float Duration) override;
 
     virtual void OnDamaged(AActor* DamageCauser) override;

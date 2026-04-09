@@ -22,7 +22,7 @@ AARPGEnemyProjectile::AARPGEnemyProjectile()
     ProjectileMovement->MaxSpeed = ProjectileSpeed;
     ProjectileMovement->bRotationFollowsVelocity = true;
     ProjectileMovement->bShouldBounce = false;
-    ProjectileMovement->ProjectileGravityScale = 0.f; // flat trajectory
+    ProjectileMovement->ProjectileGravityScale = 0.f;
 
     CollisionComponent->OnComponentHit.AddDynamic(this, &AARPGEnemyProjectile::OnHit);
 }
@@ -55,9 +55,6 @@ void AARPGEnemyProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActo
     UHealthComponent* HealthComp = OtherActor->FindComponentByClass<UHealthComponent>();
     if (HealthComp)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[PROJECTILE] Hit %s for %.1f damage"),
-            *OtherActor->GetName(), Damage);
-
         HealthComp->ApplyDamage(Damage, GetOwner());
     }
 

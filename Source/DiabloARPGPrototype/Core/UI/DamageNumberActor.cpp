@@ -11,7 +11,6 @@ ADamageNumberActor::ADamageNumberActor()
 {
     PrimaryActorTick.bCanEverTick = false;
 
-    // Create widget component FIRST
     WidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("WidgetComponent"));
     RootComponent = WidgetComponent;
 
@@ -19,7 +18,6 @@ ADamageNumberActor::ADamageNumberActor()
     WidgetComponent->SetDrawSize(FVector2D(100.f, 50.f));
     WidgetComponent->SetTwoSided(true);
 
-    // THEN assign the widget class
     static ConstructorHelpers::FClassFinder<UUserWidget> WidgetClassFinder(TEXT("/Game/UI/WBP_DamageNumber"));
     if (WidgetClassFinder.Succeeded())
     {
@@ -31,7 +29,7 @@ void ADamageNumberActor::BeginPlay()
 {
     Super::BeginPlay();
 
-    // Face the camera
+    // Face the camera on spawn
     if (APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
     {
         FVector CamLoc = Cam->GetCameraLocation();
@@ -40,10 +38,9 @@ void ADamageNumberActor::BeginPlay()
         SetActorRotation(ToCam.Rotation());
     }
 
-    // Force widget creation
     WidgetComponent->InitWidget();
 
-    // Now that the widget exists, apply pending damage
+    // Apply pending damage once widget exists
     if (PendingDamage >= 0)
     {
         Initialize(PendingDamage);
@@ -52,14 +49,12 @@ void ADamageNumberActor::BeginPlay()
 
 void ADamageNumberActor::Initialize(int32 DamageAmount)
 {
-    PendingDamage = DamageAmount; // store until widget exists
+    PendingDamage = DamageAmount;
 
     if (UWBP_DamageNumber* Widget = Cast<UWBP_DamageNumber>(WidgetComponent->GetUserWidgetObject()))
     {
-        // Set the number
         Widget->SetDamageValue(DamageAmount);
 
-        // Play animation
         if (UWidgetAnimation* Anim = Widget->GetFloatUpAnimation())
         {
             Widget->PlayAnimation(Anim);

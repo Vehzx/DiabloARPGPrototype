@@ -6,7 +6,6 @@
 #include "DiabloARPGPrototype/Core/AI/ARPGEnemyCharacter.h"
 #include "ARPGPlayerCharacter.generated.h"
 
-// Forward declarations
 class UStaticMeshComponent;
 class UHealthComponent;
 class UWidgetComponent;
@@ -35,10 +34,8 @@ protected:
     UPROPERTY(EditAnywhere, Category = "UI")
     TSubclassOf<UUserWidget> PauseMenuWidgetClass;
 
-    /** Input bindings */
     virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-
-    /* Movement */
+    
     void MoveForward(float Value);
     void MoveRight(float Value);
 
@@ -66,43 +63,30 @@ protected:
     UPROPERTY(EditAnywhere, Category = "Camera")
     TSubclassOf<UCameraShakeBase> HitCameraShake;
 
-    // UI
     UPROPERTY(EditAnywhere, Category = "UI")
     TSubclassOf<UUserWidget> GameOverWidgetClass;
 
 private:
-    // UI
     UUserWidget* PauseMenuWidgetInstance;
     bool bIsPaused = false;
 
     UPROPERTY()
     UUserWidget* GameOverWidgetInstance;
 
-    // ============================================================
     // Components
-    // ============================================================
-
-    /** Simple placeholder mesh for the character body */
     UPROPERTY(VisibleAnywhere, Category = "Components")
     UStaticMeshComponent* BodyMesh;
 
-    /** Health system for the player */
     UPROPERTY(VisibleAnywhere, Category = "Components")
     UHealthComponent* HealthComponent;
 
-    /** Floating healthbar widget */
     UPROPERTY(VisibleAnywhere, Category = "Components")
     UWidgetComponent* HealthBarWidgetComponent;
 
-    // ============================================================
     // Internal Functions
-    // ============================================================
-
-    /* Called when the player dies */
     UFUNCTION()
     void HandleDeath();
 
-    /** Test attack for debugging (left-click) */
     UFUNCTION()
     void PerformTestAttack();
 
@@ -112,10 +96,7 @@ private:
 
     float DeathShrinkSpeed = 1.5f;
 
-    // ============================================================
     // Combat
-    // ============================================================
-
     UPROPERTY(EditAnywhere, Category = "Combat")
     TSubclassOf<AARPGMeleeSwingActor> MeleeSwingClass;
 

@@ -20,7 +20,6 @@ void AARPGPlayerController::BeginPlay()
     InputMode.SetHideCursorDuringCapture(false);
     SetInputMode(InputMode);
 
-    // Attach camera pawn to player
     for (TActorIterator<AIsometricCameraPawn> It(GetWorld()); It; ++It)
     {
         AIsometricCameraPawn* Cam = *It;

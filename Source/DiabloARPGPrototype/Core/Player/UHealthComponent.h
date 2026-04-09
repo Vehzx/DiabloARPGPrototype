@@ -4,10 +4,6 @@
 #include "Components/ActorComponent.h"
 #include "UHealthComponent.generated.h"
 
-// ------------------------------------------------------------
-// Delegates
-// ------------------------------------------------------------
-
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHealthChanged, float, NewHealth, float, MaxHealth);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDeath);
 
@@ -17,26 +13,17 @@ class DIABLOARPGPROTOTYPE_API UHealthComponent : public UActorComponent
     GENERATED_BODY()
 
 public:
-    void ResetHealthToFull();
-
     UHealthComponent();
 
-    // ------------------------------------------------------------
-    // Health API
-    // ------------------------------------------------------------
     void ApplyDamage(float DamageAmount, AActor* DamageCauser);
     void Heal(float HealAmount);
+    void ResetHealthToFull();
+    void SetMaxHealth(float NewMaxHealth);
 
     float GetHealth() const { return CurrentHealth; }
     float GetMaxHealth() const { return MaxHealth; }
-
     bool IsDead() const { return bIsDead; }
 
-    void SetMaxHealth(float NewMaxHealth);
-
-    // ------------------------------------------------------------
-    // Events
-    // ------------------------------------------------------------
     UPROPERTY(BlueprintAssignable)
     FOnHealthChanged OnHealthChanged;
 
@@ -47,11 +34,6 @@ protected:
     virtual void BeginPlay() override;
 
 private:
-
-    // ------------------------------------------------------------
-    // Health Data
-    // ------------------------------------------------------------
-
     UPROPERTY(EditAnywhere, Category = "Health")
     float MaxHealth = 100.f;
 

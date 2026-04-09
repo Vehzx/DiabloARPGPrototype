@@ -26,7 +26,6 @@ void AIsometricCameraPawn::BeginPlay()
         PC->SetViewTarget(this);
     }
 
-    // Attach spotlight to camera pawn
     if (FollowSpotLight)
     {
         FollowSpotLight->AttachToActor(
@@ -34,7 +33,6 @@ void AIsometricCameraPawn::BeginPlay()
             FAttachmentTransformRules::KeepRelativeTransform
         );
 
-        // Move the light above the camera
         FollowSpotLight->SetActorRelativeLocation(FVector(800.f, 0.f, 1200.f));
     }
 }

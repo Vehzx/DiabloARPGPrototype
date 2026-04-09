@@ -19,7 +19,6 @@ protected:
 public:
     virtual void Tick(float DeltaTime) override;
 
-    // Must be public so PlayerController can call it
     void SetFollowTarget(AActor* NewTarget);
 
 private:
@@ -35,7 +34,5 @@ private:
     UPROPERTY(EditAnywhere, Category = "Camera")
     float FollowSpeed = 5.f;
 
-    // Must be declared here so the .cpp can use it
     AActor* TargetActor;
-
 };

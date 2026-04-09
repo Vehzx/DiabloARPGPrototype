@@ -16,9 +16,7 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
 {
     PrimaryActorTick.bCanEverTick = true;
 
-    // ============================================================
-    // Movement Setup
-    // ============================================================
+    // Movement
     if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
     {
         MoveComp->MaxWalkSpeed = 600.f;
@@ -27,23 +25,17 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
         MoveComp->RotationRate = FRotator(0.f, 540.f, 0.f);
     }
 
-    // ============================================================
     // Collision
-    // ============================================================
     UCapsuleComponent* Capsule = GetCapsuleComponent();
     Capsule->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
     Capsule->SetCollisionObjectType(ECC_Pawn);
     Capsule->SetCollisionResponseToAllChannels(ECR_Block);
     Capsule->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
 
-    // ============================================================
-    // Health Component
-    // ============================================================
+    // Health
     HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("HealthComponent"));
 
-    // ============================================================
-    // Health Bar Widget Component
-    // ============================================================
+    // Health Bar Widget
     HealthBarWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBar"));
     HealthBarWidgetComponent->SetupAttachment(RootComponent);
     HealthBarWidgetComponent->SetWidgetSpace(EWidgetSpace::Screen);
@@ -59,13 +51,10 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
         HealthBarWidgetComponent->SetWidgetClass(HealthBarClass.Class);
     }
 
-    // ============================================================
-    // Visual Mesh Setup
-    // ============================================================
+    // Visual Mesh
     BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh"));
     BodyMesh->SetupAttachment(GetCapsuleComponent());
 
-    // Load a simple cylinder mesh from Engine Content
     static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(
         TEXT("/Engine/BasicShapes/Cylinder.Cylinder")
     );
@@ -77,7 +66,6 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
         BodyMesh->SetRelativeLocation(FVector(0.f, 0.f, 5.f));
     }
 
-    // Apply the hit flash material
     static ConstructorHelpers::FObjectFinder<UMaterialInterface> HitFlashMat(
         TEXT("/Game/Materials/M_HitFlash.M_HitFlash")
     );
@@ -87,9 +75,7 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
         BodyMesh->SetMaterial(0, HitFlashMat.Object);
     }
 
-    // ============================================================
-    // Camera Shake Setup
-    // ============================================================
+    // Camera Shake
     static ConstructorHelpers::FClassFinder<UCameraShakeBase> ShakeClassFinder(
         TEXT("/Game/Camera/Shakes/BP_HitCameraShake")
     );
@@ -99,12 +85,9 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
         HitCameraShake = ShakeClassFinder.Class;
     }
 
-
-    // Optional: make capsule visible for debugging
     GetCapsuleComponent()->SetHiddenInGame(false);
 
-
-    // Pause Menu Setup
+    // Pause Menu
     static ConstructorHelpers::FClassFinder<UUserWidget> PauseMenuClass(
         TEXT("/Game/UI/WBP_PauseMenu.WBP_PauseMenu_C")
     );
@@ -114,7 +97,7 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
         PauseMenuWidgetClass = PauseMenuClass.Class;
     }
 
-    // Game Over Setup
+    // Game Over
     static ConstructorHelpers::FClassFinder<UUserWidget> GameOverClass(
         TEXT("/Game/UI/WBP_GameOver.WBP_GameOver_C")
     );
@@ -122,11 +105,6 @@ AARPGPlayerCharacter::AARPGPlayerCharacter()
     if (GameOverClass.Succeeded())
     {
         GameOverWidgetClass = GameOverClass.Class;
-        UE_LOG(LogTemp, Warning, TEXT("[PLAYER] GameOverWidgetClass loaded successfully"));
-    }
-    else
-    {
-        UE_LOG(LogTemp, Error, TEXT("[PLAYER] GameOverWidgetClass FAILED to load — check path"));
     }
 
     // Attack Visual
@@ -146,10 +124,8 @@ void AARPGPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 
     PlayerInputComponent->BindAxis("MoveForward", this, &AARPGPlayerCharacter::MoveForward);
     PlayerInputComponent->BindAxis("MoveRight", this, &AARPGPlayerCharacter::MoveRight);
-
     PlayerInputComponent->BindAction("TestAttack", IE_Pressed, this, &AARPGPlayerCharacter::PerformTestAttack);
     PlayerInputComponent->BindAction("Dash", IE_Pressed, this, &AARPGPlayerCharacter::Dash);
-
     PlayerInputComponent->BindAction("Pause", IE_Pressed, this, &AARPGPlayerCharacter::TogglePause);
 }
 
@@ -160,7 +136,7 @@ void AARPGPlayerCharacter::TogglePause()
 
     if (!bIsPaused)
     {
-        // Pause
+        // Enter pause state
         if (PauseMenuWidgetClass)
         {
             PauseMenuWidgetInstance = CreateWidget<UUserWidget>(PC, PauseMenuWidgetClass);
@@ -176,7 +152,7 @@ void AARPGPlayerCharacter::TogglePause()
     }
     else
     {
-        // Resume
+        // Exit pause state
         if (PauseMenuWidgetInstance)
         {
             PauseMenuWidgetInstance->RemoveFromParent();
@@ -192,13 +168,14 @@ void AARPGPlayerCharacter::TogglePause()
 
 FVector AARPGPlayerCharacter::GetMovementDirection() const
 {
+    // Prefer actual movement input
     FVector Input = GetLastMovementInputVector();
     if (!Input.IsNearlyZero())
     {
         return Input.GetSafeNormal();
     }
 
-    // If not moving, dash in facing direction
+    // If stationary, dash in facing direction
     FVector Forward = GetActorForwardVector();
     Forward.Z = 0;
     return Forward.GetSafeNormal();
@@ -206,14 +183,14 @@ FVector AARPGPlayerCharacter::GetMovementDirection() const
 
 void AARPGPlayerCharacter::MoveForward(float Value)
 {
-    LastMoveDirection.X = Value; // always update, even when 0
+    LastMoveDirection.X = Value;
 
     AddMovementInput(FVector::ForwardVector, Value);
 }
 
 void AARPGPlayerCharacter::MoveRight(float Value)
 {
-    LastMoveDirection.Y = Value; // always update, even when 0
+    LastMoveDirection.Y = Value;
 
     AddMovementInput(FVector::RightVector, Value);
 }
@@ -226,6 +203,7 @@ void AARPGPlayerCharacter::Dash()
     bIsDashing = true;
     bDashOnCooldown = true;
 
+    // Determine dash direction (movement input or facing direction)
     FVector DashDirection;
 
     if (!LastMoveDirection.IsNearlyZero())
@@ -237,23 +215,21 @@ void AARPGPlayerCharacter::Dash()
         DashDirection.Normalize();
     }
 
-    // Disable friction for smooth dash
+    // Temporarily remove friction for a smooth dash
     UCharacterMovementComponent* MoveComp = GetCharacterMovement();
     MoveComp->GroundFriction = 0.f;
     MoveComp->BrakingFrictionFactor = 0.f;
     MoveComp->BrakingDecelerationWalking = 0.f;
 
-    // Apply dash velocity
     LaunchCharacter(DashDirection * DashDistance, true, true);
 
-    // End dash
+    // Restore movement friction after dash ends
     GetWorldTimerManager().SetTimer(
         DashTimer,
         [this]()
         {
             bIsDashing = false;
 
-            // Restore movement friction
             UCharacterMovementComponent* MoveComp = GetCharacterMovement();
             MoveComp->GroundFriction = 8.f;
             MoveComp->BrakingFrictionFactor = 2.f;
@@ -263,7 +239,7 @@ void AARPGPlayerCharacter::Dash()
         false
     );
 
-    // Cooldown
+    // Dash cooldown
     GetWorldTimerManager().SetTimer(
         DashCooldownTimer,
         [this]()
@@ -282,18 +258,10 @@ void AARPGPlayerCharacter::PerformTestAttack()
 
     bCanAttack = false;
 
-    // Rotate toward cursor (your existing logic)
+    // Face the cursor before attacking
     RotateTowardMouseCursor();
 
-    // --- DEBUG: Distance to all enemies (2D only) ---
-    for (TActorIterator<AARPGEnemyCharacter> It(GetWorld()); It; ++It)
-    {
-        float Dist2D = FVector::Dist2D(GetActorLocation(), It->GetActorLocation());
-        UE_LOG(LogTemp, Warning, TEXT("[ATTACK DEBUG] Distance to %s = %f"),
-            *It->GetName(), Dist2D);
-    }
-
-    // Your existing hitbox trace
+    // Sweep parameters
     FVector Start = GetActorLocation() + FVector(0, 0, 50.f);
     FVector Forward = GetActorForwardVector();
     FVector End = Start + Forward * 200.f;
@@ -315,10 +283,7 @@ void AARPGPlayerCharacter::PerformTestAttack()
         Params
     );
 
-    // --- DEBUG: Trace result ---
-    UE_LOG(LogTemp, Warning, TEXT("[ATTACK TRACE] bHit = %s"), bHit ? TEXT("TRUE") : TEXT("FALSE"));
-
-    // Visual
+    // Spawn swing visual
     FVector SwingLocation = Start + Forward * 100.f;
     FRotator SwingRotation = GetActorRotation();
     FActorSpawnParameters SwingParams;
@@ -334,20 +299,17 @@ void AARPGPlayerCharacter::PerformTestAttack()
         );
     }
 
+    // Apply damage + spawn damage numbers
     if (bHit)
     {
         if (AActor* HitActor = Hit.GetActor())
         {
-            UE_LOG(LogTemp, Warning, TEXT("[ATTACK TRACE] Hit actor: %s"), *HitActor->GetName());
-
             if (UHealthComponent* Health = HitActor->FindComponentByClass<UHealthComponent>())
             {
                 Health->ApplyDamage(25.f, this);
-                UE_LOG(LogTemp, Warning, TEXT("Hit %s for 25 damage"), *HitActor->GetName());
 
-                // Spawn damage number at hit location
+                // Damage number popup
                 FVector SpawnLocation = Hit.ImpactPoint;
-
                 ADamageNumberActor* DamageActor = GetWorld()->SpawnActor<ADamageNumberActor>(
                     ADamageNumberActor::StaticClass(),
                     SpawnLocation,
@@ -359,6 +321,7 @@ void AARPGPlayerCharacter::PerformTestAttack()
                     DamageActor->Initialize(25);
                 }
 
+                // Camera shake feedback
                 if (APlayerController* PC = Cast<APlayerController>(GetController()))
                 {
                     PC->PlayerCameraManager->StartCameraShake(HitCameraShake);
@@ -366,12 +329,8 @@ void AARPGPlayerCharacter::PerformTestAttack()
             }
         }
     }
-    else
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[ATTACK TRACE] No actor hit"));
-    }
 
-    // Start cooldown
+    // Attack cooldown
     GetWorldTimerManager().SetTimer(
         AttackCooldownTimer,
         [this]()
@@ -387,13 +346,11 @@ void AARPGPlayerCharacter::BeginPlay()
 {
     Super::BeginPlay();
 
-    // Bind death event
     if (HealthComponent)
     {
         HealthComponent->OnDeath.AddDynamic(this, &AARPGPlayerCharacter::HandleDeath);
     }
 
-    // Bind healthbar widget to health component
     if (HealthBarWidgetComponent)
     {
         if (UWHealthBarWidget* HB = Cast<UWHealthBarWidget>(HealthBarWidgetComponent->GetUserWidgetObject()))
@@ -414,7 +371,7 @@ void AARPGPlayerCharacter::RotateTowardMouseCursor()
     {
         FVector Target = Hit.ImpactPoint;
         FVector Direction = Target - GetActorLocation();
-        Direction.Z = 0.f; // keep rotation flat
+        Direction.Z = 0.f;
 
         if (!Direction.IsNearlyZero())
         {
@@ -428,10 +385,9 @@ void AARPGPlayerCharacter::FlashOnHit()
 {
     if (!BodyMesh) return;
 
-    // Flash red
+    // Flash red briefly
     BodyMesh->SetVectorParameterValueOnMaterials("BaseColour", FVector(1.0f, 0.0f, 0.0f));
 
-    // Revert after short delay
     FTimerHandle TimerHandle;
     GetWorldTimerManager().SetTimer(TimerHandle, [this]()
         {
@@ -451,7 +407,7 @@ void AARPGPlayerCharacter::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
 
-    // --- DEATH SHRINK ---
+    // Shrink effect during death animation
     if (bIsDying)
     {
         FVector NewScale = GetActorScale3D() - FVector(DeathShrinkSpeed * DeltaTime);
@@ -461,10 +417,10 @@ void AARPGPlayerCharacter::Tick(float DeltaTime)
         NewScale.Z = FMath::Max(NewScale.Z, 0.0f);
 
         SetActorScale3D(NewScale);
-        return; // No need to process hover logic while dying
+        return;
     }
 
-    // --- CURSOR HOVER ENEMY DETECTION ---
+    // Cursor hover detection for enemies
     APlayerController* PC = Cast<APlayerController>(GetController());
     if (!PC)
         return;
@@ -472,16 +428,15 @@ void AARPGPlayerCharacter::Tick(float DeltaTime)
     FHitResult Hit;
     PC->GetHitResultUnderCursor(ECC_Visibility, false, Hit);
 
-    // Check if we are hovering an enemy
     AARPGEnemyCharacter* HoveredEnemy = Cast<AARPGEnemyCharacter>(Hit.GetActor());
 
-    // If we hovered a NEW enemy, hide the old one
+    // Hide previous hover decal
     if (LastHoveredEnemy && LastHoveredEnemy != HoveredEnemy)
     {
         LastHoveredEnemy->HideHoverDecal();
     }
 
-    // If we are hovering an enemy, show its decal
+    // Show new hover decal
     if (HoveredEnemy)
     {
         HoveredEnemy->ShowHoverDecal();
@@ -497,34 +452,30 @@ void AARPGPlayerCharacter::HandleDeath()
 {
     UE_LOG(LogTemp, Warning, TEXT("Player has died"));
 
-    // Safely disable input
     APlayerController* PC = Cast<APlayerController>(GetController());
     if (PC)
     {
         DisableInput(PC);
     }
 
-    // Disable movement
     if (GetCharacterMovement())
         GetCharacterMovement()->DisableMovement();
 
-    // Disable collision
     if (GetCapsuleComponent())
         GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-    // Begin shrinking
     bIsDying = true;
 
-    // Extend lifespan to give widget time to show
     SetLifeSpan(2.0f);
 
-    // Show Game Over screen
+    // Prepare UI for game over
     if (PC && GameOverWidgetClass)
     {
         PC->bShowMouseCursor = true;
         PC->SetInputMode(FInputModeUIOnly());
     }
 
+    // Delay before showing game over widget
     FTimerHandle GameOverTimer;
     GetWorldTimerManager().SetTimer(
         GameOverTimer,

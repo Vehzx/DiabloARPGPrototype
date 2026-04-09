@@ -7,7 +7,6 @@
 #include "Components/BillboardComponent.h"
 #include "ARPGEnemyCharacter.generated.h"
 
-// Forward declarations
 class UStaticMeshComponent;
 class UHealthComponent;
 class UWidgetComponent;
@@ -94,7 +93,6 @@ public:
 protected:
     virtual void BeginPlay() override;
 
-    // Override in subclasses that handle their own chase movement
     virtual bool OverridesChaseMovement() const { return false; }
 
     bool bIsMovingToTarget = false;
@@ -121,7 +119,6 @@ protected:
     virtual void HandleDeath();
 
 private:
-
     // Components
     UPROPERTY(VisibleAnywhere, Category = "Components")
     UStaticMeshComponent* BodyMesh;
@@ -130,7 +127,6 @@ private:
     UWidgetComponent* HealthBarWidgetComponent;
 
     // AI Perception
-
     UPROPERTY()
     UAISenseConfig_Hearing* HearingConfig;
 
@@ -139,8 +135,6 @@ private:
 
     UFUNCTION()
     void OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
-
-    // Enemy State Machine
 
     void HandleStateChanged(EEnemyState OldState, EEnemyState NewState);
 
@@ -166,7 +160,6 @@ private:
     void AdvancePatrol();
 
     // Combat
-
     UPROPERTY(EditAnywhere, Category = "Combat")
     float AttackWindupTime = 0.5f;
 

@@ -14,8 +14,6 @@ void UWHealthBarWidget::InitializeHealth(UHealthComponent* InHealthComponent)
     if (HealthComponent)
     {
         HealthComponent->OnHealthChanged.AddDynamic(this, &UWHealthBarWidget::OnHealthChanged);
-
-        // Initialize bar
         OnHealthChanged(HealthComponent->GetHealth(), HealthComponent->GetMaxHealth());
     }
 }
