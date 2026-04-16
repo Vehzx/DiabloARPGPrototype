@@ -88,12 +88,14 @@ public:
 
     virtual bool CanBeKnockedBack() const { return true; }
 
-    virtual float GetPlayerLeashDistance() const { return 900.f; }
+    virtual float GetPlayerLeashDistance() const { return LeashRadius; }
 
 protected:
     virtual void BeginPlay() override;
 
     virtual bool OverridesChaseMovement() const { return false; }
+
+    bool bStartedCombatFromPatrol = false;
 
     bool bIsMovingToTarget = false;
 
