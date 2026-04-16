@@ -284,6 +284,18 @@ void AARPGEnemyCharacter::SetEnemyState(EEnemyState NewState)
     EEnemyState OldState = CurrentState;
     CurrentState = NewState;
 
+    // Track whether combat STARTED from patrol (only set once)
+    if (NewState == EEnemyState::Chase && OldState == EEnemyState::Patrol)
+    {
+        bStartedCombatFromPatrol = true;
+    }
+
+    // Clear the flag when combat ends (Idle or Patrol)
+    if (NewState == EEnemyState::Idle || NewState == EEnemyState::Patrol)
+    {
+        bStartedCombatFromPatrol = false;
+    }
+
     HandleStateChanged(OldState, NewState);
 }
 
@@ -766,11 +778,12 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
             }
         }
 
-        // LEASH LOGIC
-        float DistanceToPlayer = FVector::Dist2D(GetActorLocation(), CurrentTarget->GetActorLocation());
+        // LEASH LOGIC — reset if AI has wandered too far from its spawn point
+        float DistanceFromSpawn = FVector::Dist2D(GetActorLocation(), SpawnLocation);
         const float PlayerLeashDistance = GetPlayerLeashDistance();
 
-        if (DistanceToPlayer > PlayerLeashDistance)
+        // Only leash if combat did NOT start from patrol
+        if (!bStartedCombatFromPatrol && DistanceFromSpawn > PlayerLeashDistance)
         {
             bIsMovingToTarget = false;
             CurrentTarget = nullptr;
@@ -787,13 +800,9 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
             }
 
             if (PatrolPoints.Num() > 0)
-            {
                 SetEnemyState(EEnemyState::Patrol);
-            }
             else
-            {
                 SetEnemyState(EEnemyState::Idle);
-            }
 
             return;
         }
@@ -850,7 +859,7 @@ void AARPGEnemyCharacter::Tick(float DeltaTime)
     {
         // Leash check from spawn position
         float DistanceFromSpawn = FVector::Dist(GetActorLocation(), SpawnLocation);
-        if (DistanceFromSpawn > LeashRadius)
+        if (!bStartedCombatFromPatrol && DistanceFromSpawn > LeashRadius)
         {
             HandleLeashReset();
             return;
@@ -896,6 +905,9 @@ void AARPGEnemyCharacter::HealOverTimeTick()
 
 void AARPGEnemyCharacter::HandleLeashReset()
 {
+    // Reset patrol‑combat flag (combat has ended)
+    bStartedCombatFromPatrol = false;
+
     // Heal to full when leash range triggers
     if (HealthComponent)
     {
