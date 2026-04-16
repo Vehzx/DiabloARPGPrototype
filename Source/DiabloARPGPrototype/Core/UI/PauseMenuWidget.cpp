@@ -23,8 +23,12 @@ void UPauseMenuWidget::OnResumeClicked()
     if (AARPGPlayerCharacter* Player = Cast<AARPGPlayerCharacter>(PC->GetPawn()))
     {
         Player->TogglePause();
+
+        PC->bShowMouseCursor = true;
+        PC->SetInputMode(FInputModeGameAndUI());
     }
 }
+
 
 void UPauseMenuWidget::OnMainMenuClicked()
 {
